@@ -373,15 +373,37 @@
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error("Unexpected JSON shape (expected array).");
 
+      // Robust station-id mapping (different API shapes + fallback to parsing raw_text)
       const byStation = new Map();
-      for (const item of data){
-        const sid = item.station_id || item.stationId || item.icao || item.id;
+      for (const item of data) {
+        let sid =
+          item.station_id ??
+          item.stationId ??
+          item.icaoId ??
+          item.icao_id ??
+          item.icao ??
+          item.station ??
+          item.id ??
+          item.site_id ??
+          item.properties?.station_id ??
+          item.properties?.stationId ??
+          item.properties?.icaoId ??
+          null;
+
+        if (!sid) {
+          const raw = (item.raw_text ?? item.rawText ?? item.raw ?? item.metar ?? "") || "";
+          const m = raw.match(/\b(?:METAR|SPECI)\s+([A-Z]{4})\b/i);
+          if (m) sid = m[1];
+        }
+
         if (!sid) continue;
-        byStation.set(String(sid).toUpperCase(), item);
+        byStation.set(String(sid).toUpperCase().trim(), item);
       }
 
       for (const s of STATIONS){
-        const item = byStation.get(s);
+        const key = String(s).toUpperCase().trim();
+        const item = byStation.get(key);
+
         if (!item){
           applyRow(s, { raw_text: "— no station in response —" });
           document.getElementById(`obs_${s}`).textContent = "--Z";
