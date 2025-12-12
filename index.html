@@ -218,11 +218,12 @@
 
   <div class="foot">
     <div>Source: METAR proxy → <span class="muted">metar-proxy.chrisgut96.workers.dev</span></div>
-    <div>Refresh: every minute (or change dropdown)</div>
+    <div>Tip: hard refresh with <span class="muted">Ctrl+F5</span> after updating</div>
   </div>
 </div>
 
 <script>
+  // Stations you asked for
   const STATIONS = ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"];
   const API_BASE = "https://metar-proxy.chrisgut96.workers.dev";
 
@@ -235,14 +236,14 @@
 
   const state = {
     timer: null,
-    lastRaw: new Map(),
+    lastRaw: new Map(), // station -> rawOb
   };
 
   function pad2(n){ return String(n).padStart(2,"0"); }
   function setUtcClock(){
     const d = new Date();
-    document.getElementById("utcClock").textContent =
-      `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
+    const s = `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
+    document.getElementById("utcClock").textContent = s;
   }
   setInterval(setUtcClock, 500);
   setUtcClock();
@@ -257,15 +258,15 @@
     errorBox.textContent = "";
   }
 
-  // altim is already QNH in hPa in this JSON format (e.g. 1021) :contentReference[oaicite:5]{index=5}
+  // JSON: altim = QNH in hPa already (e.g. 1021) -> show "Q1021"
   function fmtQnh(item){
     const qnh = item?.altim;
     if (qnh == null || qnh === "") return "--";
     const n = Number(qnh);
-    if (isNaN(n)) return `Q${String(qnh)}`;
-    return `Q${Math.round(n)}`;
+    return isNaN(n) ? `Q${String(qnh)}` : `Q${Math.round(n)}`;
   }
 
+  // JSON: temp, dewp are numeric C
   function fmtTemp(item){
     const t = item?.temp;
     const d = item?.dewp;
@@ -275,6 +276,7 @@
     return `${tt}/${dd}`;
   }
 
+  // JSON: wdir (deg), wspd (kt)
   function fmtWind(item){
     const dir = item?.wdir;
     const spd = item?.wspd;
@@ -284,17 +286,29 @@
     return `${d}${s}`;
   }
 
-  // visib in this format is in statute miles (e.g. 1.24) :contentReference[oaicite:6]{index=6}
-  // Convert to meters and display like ATC boards.
+  // VIS: prefer reading METAR visibility group from rawOb (e.g. "2000", "9999", "CAVOK")
   function fmtVis(item){
+    const raw = (item?.rawOb ?? "") || "";
+
+    // CAVOK implies >= 10km
+    if (/\bCAVOK\b/i.test(raw)) return "9999+";
+
+    // Find a standalone 4-digit visibility group (meters) early in the report.
+    // Example: "... 21005KT 2000 1200 R23/1700U ..."
+    // We'll take the first 4-digit group after wind if present.
+    const m = raw.match(/\b\d{5}KT\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
+    if (m && m[1]) {
+      return (m[1] === "9999") ? "9999+" : m[1];
+    }
+
+    // Fallback: convert JSON visib (statute miles) to meters
     const v = item?.visib;
     if (v == null || v === "") return "--";
     const miles = Number(v);
     if (isNaN(miles)) return String(v);
 
     const meters = Math.round(miles * 1609.34);
-    if (meters >= 9999) return "9999+";
-    // Round to nearest 50m for nicer display
+    if (meters >= 10000) return "9999+";
     const rounded = Math.round(meters / 50) * 50;
     return String(rounded);
   }
@@ -321,18 +335,17 @@
     for (const s of STATIONS) tbody.appendChild(mkRow(s));
   }
 
-  // Use reportTime ISO if present; else obsTime epoch seconds :contentReference[oaicite:7]{index=7}
   function obsZFromItem(item){
+    // Prefer reportTime ISO; fallback to obsTime epoch seconds
     let d = null;
     if (item?.reportTime) d = new Date(item.reportTime);
     else if (item?.obsTime != null) d = new Date(Number(item.obsTime) * 1000);
-
     if (!d || isNaN(d.getTime())) return "--Z";
     return `${pad2(d.getUTCDate())}${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}Z`;
   }
 
   function applyRow(station, item){
-    const raw = (item?.rawOb ?? item?.raw_text ?? item?.rawText ?? item?.raw ?? item?.metar ?? "") || ""; // rawOb is the one in your JSON :contentReference[oaicite:8]{index=8}
+    const raw = (item?.rawOb ?? "") || "";
 
     document.getElementById(`obs_${station}`).textContent = obsZFromItem(item);
     document.getElementById(`qnh_${station}`).textContent = fmtQnh(item);
@@ -361,8 +374,8 @@
       const url = `${API_BASE}/?ids=${ids}&format=json&_=${Date.now()}`;
 
       const res = await fetch(url, { headers: { "Accept": "application/json" }, cache: "no-store" });
-
       if (res.status === 204) throw new Error("No data returned (HTTP 204).");
+
       if (!res.ok){
         const t = await res.text();
         throw new Error(`Request failed (HTTP ${res.status}).\n\n${t.slice(0,900)}`);
@@ -371,19 +384,12 @@
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error("Unexpected JSON shape (expected array).");
 
-      // This proxy JSON uses icaoId for station id :contentReference[oaicite:9]{index=9}
+      // Map by icaoId (your JSON)
       const byStation = new Map();
       for (const item of data){
-        let sid = item?.icaoId ?? item?.station_id ?? item?.stationId ?? item?.icao ?? item?.id ?? null;
-
-        if (!sid) {
-          const raw = (item?.rawOb ?? item?.raw_text ?? "") || "";
-          const m = raw.match(/\b(?:METAR|SPECI)\s+([A-Z]{4})\b/i);
-          if (m) sid = m[1];
-        }
-
+        const sid = item?.icaoId ? String(item.icaoId).toUpperCase().trim() : null;
         if (!sid) continue;
-        byStation.set(String(sid).toUpperCase().trim(), item);
+        byStation.set(sid, item);
       }
 
       for (const s of STATIONS){
