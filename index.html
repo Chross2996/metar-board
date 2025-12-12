@@ -228,7 +228,7 @@
 <script>
   // Stations you asked for
   const STATIONS = ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"];
-  const API_BASE = "metar-board.chrisgut96.workers.dev";
+  const API_BASE = "https://metar-board.chrisgut96.workers.dev";
 
   const refreshBtn = document.getElementById("refreshBtn");
   const autoToggle = document.getElementById("autoToggle");
@@ -360,7 +360,7 @@
 
     try{
       const ids = encodeURIComponent(STATIONS.join(","));
-      const url = `${API_BASE}?ids=${ids}&format=json&_=${Date.now()}`;
+      const url = `${API_BASE}/?ids=${ids}&format=json&_=${Date.now()}`;
 
       const res = await fetch(url, { headers: { "Accept": "application/json" }, cache: "no-store" });
 
