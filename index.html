@@ -7,7 +7,7 @@
 <style>
   :root{
     color-scheme: dark;
-    --bg:#062a8a;          /* deep ATC blue */
+    --bg:#062a8a;
     --panel:#041f66;
     --panel2:#0733a5;
     --line:#b9d3ff;
@@ -112,7 +112,6 @@
     white-space: pre-wrap;
   }
 
-  /* Table-like board */
   .board{
     width:100%;
     border-collapse: collapse;
@@ -214,19 +213,16 @@
         <th class="col-met">METAR</th>
       </tr>
     </thead>
-    <tbody id="tbody">
-      <!-- rows injected -->
-    </tbody>
+    <tbody id="tbody"></tbody>
   </table>
 
   <div class="foot">
-    <div>Source: aviationweather.gov Data API → <span class="muted">/api/data/metar?ids=...&format=json</span></div>
-    <div>Tip: If browser blocks requests on file://, run <span class="muted">python -m http.server</span></div>
+    <div>Source: METAR proxy → <span class="muted">metar-proxy.chrisgut96.workers.dev</span></div>
+    <div>Refresh: every minute (or change dropdown)</div>
   </div>
 </div>
 
 <script>
-  // Stations you asked for
   const STATIONS = ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"];
   const API_BASE = "https://metar-proxy.chrisgut96.workers.dev";
 
@@ -239,15 +235,14 @@
 
   const state = {
     timer: null,
-    lastRaw: new Map(), // station -> raw_text
-    lastFetchAt: null,
+    lastRaw: new Map(),
   };
 
   function pad2(n){ return String(n).padStart(2,"0"); }
   function setUtcClock(){
     const d = new Date();
-    const s = `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
-    document.getElementById("utcClock").textContent = s;
+    document.getElementById("utcClock").textContent =
+      `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
   }
   setInterval(setUtcClock, 500);
   setUtcClock();
@@ -262,20 +257,18 @@
     errorBox.textContent = "";
   }
 
+  // altim is already QNH in hPa in this JSON format (e.g. 1021) :contentReference[oaicite:5]{index=5}
   function fmtQnh(item){
-    // API often returns altim_in_hg; some also return sea_level_pressure_mb or altim.
-    const mb = item.sea_level_pressure_mb ?? item.slp_mb ?? item.slp ?? null;
-    if (mb) return `Q${Math.round(Number(mb))}`;
-    const inhg = item.altim_in_hg ?? item.altim ?? null;
-    if (!inhg) return "--";
-    // Convert inHg to hPa, typical: 29.92 -> 1013
-    const hpa = Math.round(Number(inhg) * 33.8639);
-    return `Q${hpa}`;
+    const qnh = item?.altim;
+    if (qnh == null || qnh === "") return "--";
+    const n = Number(qnh);
+    if (isNaN(n)) return `Q${String(qnh)}`;
+    return `Q${Math.round(n)}`;
   }
 
   function fmtTemp(item){
-    const t = item.temp_c ?? item.tempC ?? null;
-    const d = item.dewpoint_c ?? item.dewpointC ?? item.dew_c ?? null;
+    const t = item?.temp;
+    const d = item?.dewp;
     if (t == null && d == null) return "--/--";
     const tt = (t == null) ? "--" : Math.round(Number(t));
     const dd = (d == null) ? "--" : Math.round(Number(d));
@@ -283,33 +276,37 @@
   }
 
   function fmtWind(item){
-    const dir = item.wind_dir_degrees ?? item.wind_dir ?? item.wdir ?? null;
-    const spd = item.wind_speed_kt ?? item.wind_speed ?? item.wspd ?? null;
-    const gst = item.wind_gust_kt ?? item.wind_gust ?? null;
+    const dir = item?.wdir;
+    const spd = item?.wspd;
     if (dir == null && spd == null) return "----";
     const d = (dir == null) ? "///" : String(Math.round(Number(dir))).padStart(3,"0");
     const s = (spd == null) ? "//" : String(Math.round(Number(spd))).padStart(2,"0");
-    const g = (gst == null) ? "" : `G${String(Math.round(Number(gst))).padStart(2,"0")}`;
-    return `${d}${s}${g}`;
+    return `${d}${s}`;
   }
 
+  // visib in this format is in statute miles (e.g. 1.24) :contentReference[oaicite:6]{index=6}
+  // Convert to meters and display like ATC boards.
   function fmtVis(item){
-    // API fields vary; use visibility_statute_mi if present, else raw
-    const v = item.visibility_statute_mi ?? item.vis_mi ?? item.visibility ?? null;
-    if (v == null) return "--";
-    const n = Number(v);
-    if (!isNaN(n)) {
-      if (n >= 6) return "9999+";
-      return `${n.toFixed(0)}SM`;
-    }
-    return String(v).slice(0,6);
+    const v = item?.visib;
+    if (v == null || v === "") return "--";
+    const miles = Number(v);
+    if (isNaN(miles)) return String(v);
+
+    const meters = Math.round(miles * 1609.34);
+    if (meters >= 9999) return "9999+";
+    // Round to nearest 50m for nicer display
+    const rounded = Math.round(meters / 50) * 50;
+    return String(rounded);
   }
 
   function mkRow(station){
     const tr = document.createElement("tr");
     tr.id = `row_${station}`;
     tr.innerHTML = `
-      <td class="col-sta"><div class="sta">${station}</div><div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div></td>
+      <td class="col-sta">
+        <div class="sta">${station}</div>
+        <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
+      </td>
       <td class="col-qnh" id="qnh_${station}">--</td>
       <td class="col-temp" id="temp_${station}">--/--</td>
       <td class="col-wind" id="wind_${station}">----</td>
@@ -324,28 +321,29 @@
     for (const s of STATIONS) tbody.appendChild(mkRow(s));
   }
 
-  function obsZ(iso){
-    if (!iso) return "--Z";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "--Z";
+  // Use reportTime ISO if present; else obsTime epoch seconds :contentReference[oaicite:7]{index=7}
+  function obsZFromItem(item){
+    let d = null;
+    if (item?.reportTime) d = new Date(item.reportTime);
+    else if (item?.obsTime != null) d = new Date(Number(item.obsTime) * 1000);
+
+    if (!d || isNaN(d.getTime())) return "--Z";
     return `${pad2(d.getUTCDate())}${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}Z`;
   }
 
   function applyRow(station, item){
-    const raw = (item?.raw_text ?? item?.rawText ?? item?.raw ?? item?.metar ?? "") || "";
-    const obs = item?.observation_time ?? item?.observationTime ?? item?.time ?? item?.issue_time ?? "";
+    const raw = (item?.rawOb ?? item?.raw_text ?? item?.rawText ?? item?.raw ?? item?.metar ?? "") || ""; // rawOb is the one in your JSON :contentReference[oaicite:8]{index=8}
 
-    document.getElementById(`obs_${station}`).textContent = obsZ(obs);
-    document.getElementById(`qnh_${station}`).textContent = fmtQnh(item ?? {});
-    document.getElementById(`temp_${station}`).textContent = fmtTemp(item ?? {});
-    document.getElementById(`wind_${station}`).textContent = fmtWind(item ?? {});
-    document.getElementById(`vis_${station}`).textContent = fmtVis(item ?? {});
+    document.getElementById(`obs_${station}`).textContent = obsZFromItem(item);
+    document.getElementById(`qnh_${station}`).textContent = fmtQnh(item);
+    document.getElementById(`temp_${station}`).textContent = fmtTemp(item);
+    document.getElementById(`wind_${station}`).textContent = fmtWind(item);
+    document.getElementById(`vis_${station}`).textContent = fmtVis(item);
 
     const met = document.getElementById(`metar_${station}`);
     const prev = state.lastRaw.get(station);
 
     met.classList.remove("changed","new");
-
     if (!prev && raw) met.classList.add("new");
     else if (prev && raw && prev !== raw) met.classList.add("changed");
 
@@ -373,25 +371,13 @@
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error("Unexpected JSON shape (expected array).");
 
-      // Robust station-id mapping (different API shapes + fallback to parsing raw_text)
+      // This proxy JSON uses icaoId for station id :contentReference[oaicite:9]{index=9}
       const byStation = new Map();
-      for (const item of data) {
-        let sid =
-          item.station_id ??
-          item.stationId ??
-          item.icaoId ??
-          item.icao_id ??
-          item.icao ??
-          item.station ??
-          item.id ??
-          item.site_id ??
-          item.properties?.station_id ??
-          item.properties?.stationId ??
-          item.properties?.icaoId ??
-          null;
+      for (const item of data){
+        let sid = item?.icaoId ?? item?.station_id ?? item?.stationId ?? item?.icao ?? item?.id ?? null;
 
         if (!sid) {
-          const raw = (item.raw_text ?? item.rawText ?? item.raw ?? item.metar ?? "") || "";
+          const raw = (item?.rawOb ?? item?.raw_text ?? "") || "";
           const m = raw.match(/\b(?:METAR|SPECI)\s+([A-Z]{4})\b/i);
           if (m) sid = m[1];
         }
@@ -405,7 +391,7 @@
         const item = byStation.get(key);
 
         if (!item){
-          applyRow(s, { raw_text: "— no station in response —" });
+          applyRow(s, { rawOb: "— no station in response —" });
           document.getElementById(`obs_${s}`).textContent = "--Z";
           document.getElementById(`qnh_${s}`).textContent = "--";
           document.getElementById(`temp_${s}`).textContent = "--/--";
@@ -417,7 +403,6 @@
       }
 
       setStatus("OK");
-      state.lastFetchAt = new Date();
     } catch(e){
       setStatus("ERR");
       showError(String(e?.message || e));
