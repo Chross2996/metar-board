@@ -313,22 +313,30 @@
     return String(rounded);
   }
 
-  function mkRow(station){
-    const tr = document.createElement("tr");
-    tr.id = `row_${station}`;
-    tr.innerHTML = `
-      <td class="col-sta">
-        <div class="sta">${station}</div>
-        <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
-      </td>
-      <td class="col-qnh" id="qnh_${station}">--</td>
-      <td class="col-temp" id="temp_${station}">--/--</td>
-      <td class="col-wind" id="wind_${station}">----</td>
-      <td class="col-vis" id="vis_${station}">--</td>
-      <td class="col-met"><div class="metar" id="metar_${station}">Loading…</div></td>
-    `;
-    return tr;
-  }
+function mkRow(station){
+  const tr = document.createElement("tr");
+  tr.id = `row_${station}`;
+  tr.innerHTML = `
+    <td class="col-sta">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div>
+          <div class="sta">${station}</div>
+          <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
+        </div>
+        <button class="pill" style="padding:6px 10px;"
+          onclick="location.href='charts.html?icao=${encodeURIComponent(station)}'">
+          CHARTS
+        </button>
+      </div>
+    </td>
+    <td class="col-qnh" id="qnh_${station}">--</td>
+    <td class="col-temp" id="temp_${station}">--/--</td>
+    <td class="col-wind" id="wind_${station}">----</td>
+    <td class="col-vis" id="vis_${station}">--</td>
+    <td class="col-met"><div class="metar" id="metar_${station}">Loading…</div></td>
+  `;
+  return tr;
+}
 
   function ensureRows(){
     tbody.innerHTML = "";
