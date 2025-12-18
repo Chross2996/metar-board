@@ -293,9 +293,16 @@ body{
 
 <script>
   // Stations you asked for
-  const STATIONS = ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"];
+  const STATION_PRESETS = {
+  EBG_NORD: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"],
+  EBG_SUED: ["EDDV","EDVE","EDVK","EDDW","EDDG","EDDP","ETNW","ETHB","ETHC","ETSH"],   // example: change to yours
+  EDWW_WEST: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","EDVE","EDVK","EDDP"],        // example: change to yours
+};
+
+  let STATIONS = [...STATION_PRESETS.EBG_NORD];
   const API_BASE = "https://metar-proxy.chrisgut96.workers.dev";
 
+  const presetSelect = document.getElementById("presetSelect");
   const refreshBtn = document.getElementById("refreshBtn");
   const autoToggle = document.getElementById("autoToggle");
   const refreshSelect = document.getElementById("refreshSelect");
@@ -307,6 +314,15 @@ body{
     timer: null,
     lastRaw: new Map(), // station -> rawOb
   };
+
+  function setPreset(key){
+  STATIONS = [...(STATION_PRESETS[key] || STATION_PRESETS.EBG_NORD)];
+  state.lastRaw = new Map();     // reset change highlighting
+  ensureRows();                  // rebuild rows
+  fetchMetars();                 // refetch METARs
+  fetchAtisRunways();            // refetch runways (if you have it)
+  fetchOnlineCtr();              // refetch CTR (if you have it)
+}
 
   function setCtrLine(icao, isOnline) {
   const el = document.getElementById(`ctr_${icao}`);
@@ -322,6 +338,10 @@ body{
       `<span class="ctroff">OFF</span>`;
   }
 }
+
+presetSelect.addEventListener("change", () => {
+  setPreset(presetSelect.value);
+}); 
 
 async function fetchOnlineCtr(){
   try{
