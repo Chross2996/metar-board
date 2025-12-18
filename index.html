@@ -315,13 +315,23 @@ body{
   };
 }
 
-  function formatRunwayDisplay(r) {
+function formatRunwayDisplay(r) {
   const a = r.arrival.join(", ");
   const d = r.departure.join(", ");
-  if (a && d && a !== d) return `LDG ${a}  TKOF ${d}`;
-  if (a && d) return `RWY ${a}`; // same runway for both
+
+  // If we found explicit different arrival/departure
+  if (a && d && a !== d) return `LDG ${a} TKOF ${d}`;
+
+  // If we found something (either explicit or fallback from RWY)
+  if (a || d) {
+    const same = a || d; // they will be same in RWY-only case
+    return `RWY ${same}`;
+  }
+
+  // As last fallback: plain RWY matches
   if (r.general.length) return `RWY ${r.general.join(", ")}`;
-  return "";
+
+  return "RWY --";
 }
 
   function pad2(n){ return String(n).padStart(2,"0"); }
@@ -437,7 +447,8 @@ function mkRow(station){
   tr.innerHTML = `
     <td class="col-sta">
       <div class="sta">${station}</div>
-      <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
+      <div class="muted" id="rwy_${station}" style="margin-top:3px;font-size:12px;">RWY --</div>
+      <div class="muted" id="obs_${station}" style="margin-top:2px;font-size:11px;">--Z</div>
     </td>
     <td class="col-qnh" id="qnh_${station}">--</td>
     <td class="col-wind" id="wind_${station}">----</td>
@@ -533,6 +544,53 @@ function mkRow(station){
     }
   }
 
+  async function fetchAtisRunways(){
+  try{
+    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const atisArr = Array.isArray(data?.atis) ? data.atis : [];
+
+    // Build map ICAO -> best ATIS text
+    const atisByIcao = new Map();
+
+    for (const a of atisArr) {
+      const cs = String(a?.callsign || "").toUpperCase();
+      // Typical: EDDH_ATIS, EDHI_ATIS, sometimes EDDH_I_ATIS etc.
+      const m = cs.match(/^([A-Z]{4})_.*ATIS$/);
+      if (!m) continue;
+
+      const icao = m[1];
+      const lines = Array.isArray(a?.text_atis) ? a.text_atis : [];
+      const text = lines.join(" ").trim();
+      if (!text) continue;
+
+      // Prefer the longest ATIS text if multiple exist
+      const prev = atisByIcao.get(icao);
+      if (!prev || text.length > prev.text.length) {
+        atisByIcao.set(icao, { lines, text });
+      }
+    }
+
+    for (const s of STATIONS) {
+      const node = document.getElementById(`rwy_${s}`);
+      if (!node) continue;
+
+      const atis = atisByIcao.get(s);
+      if (!atis) {
+        node.textContent = "RWY --";
+        continue;
+      }
+
+      const r = extractRunwaysFromAtis(atis.lines);
+      node.textContent = formatRunwayDisplay(r);
+    }
+  } catch {
+    // ignore ATIS errors; METAR should keep working
+  }
+}
+
   function startTimer(){
     stopTimer();
     if (!autoToggle.checked) return;
@@ -547,10 +605,13 @@ function mkRow(station){
   refreshBtn.addEventListener("click", fetchMetars);
   autoToggle.addEventListener("change", startTimer);
   refreshSelect.addEventListener("change", startTimer);
+ensureRows();
+fetchMetars();
+fetchAtisRunways();
+startTimer();
 
-  ensureRows();
-  fetchMetars();
-  startTimer();
+// refresh ATIS runways every 60s as well (independent of METAR interval)
+setInterval(fetchAtisRunways, 60000);
 </script>
 
 </body>
