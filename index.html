@@ -21,18 +21,13 @@
   }
 
   *{box-sizing:border-box}
-body{
-  margin:0;
-  padding:18px;
-  background: linear-gradient(
-    180deg,
-    #041a55 0%,   /* very dark blue */
-    #031445 55%,  /* core background */
-    #020f36 100%  /* almost navy */
-  );
-  color:var(--text);
-  font-family:var(--sans);
-}
+  body{
+    margin:0;
+    padding:18px;
+    background: linear-gradient(180deg,#041a55 0%,#031445 55%,#020f36 100%);
+    color:var(--text);
+    font-family:var(--sans);
+  }
 
   .frame{
     border: 2px solid var(--line);
@@ -140,80 +135,25 @@ body{
   }
 
   .col-sta{ width: 90px; }
-  .col-qnh{ width: 92px; }
-  .col-temp{ width: 92px; }
-  .col-wind{ width: 110px; }
+  .col-ctr{ width: 95px; font-weight: 900; font-size: 14px; letter-spacing: 0.4px; }
+  .col-rwy{ width: 120px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
+  .col-qnh{ width: 92px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
+  .col-wind{ width: 130px; font-weight: 900; font-size: 16px; letter-spacing: 0.6px; }
   .col-vis{ width: 90px; }
   .col-met{ width: auto; }
 
-  .col-wind{
-  font-weight: 900;     /* bold */
-  font-size: 16px;      /* slightly bigger */
-  letter-spacing: 0.6px;
-}
-  
-  .col-qnh{
-  font-weight: 900;      /* bold */
-  font-size: 16px;       /* bigger */
-  letter-spacing: 0.5px;
-}
+  .ctrlabel{ color: var(--text); font-weight: 900; }
+  .ctractive{ color: var(--green); font-weight: 900; }
+  .ctroff{ color: rgba(234,242,255,.55); font-weight: 700; }
 
-.ctrline{
-  margin-top:4px;
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.15;
-}
+  .sta{
+    color: var(--cyan);
+    font-weight: 900;
+    font-size: 16px;
+    letter-spacing: 1.2px;
+    line-height: 1.1;
+  }
 
-.ctrlabel{
-  color: var(--text);     /* white */
-  font-weight: 900;
-}
-
-.ctractive{
-  color: var(--green);    /* green */
-  font-weight: 900;
-}
-
-.ctroff{
-  color: rgba(234,242,255,.55);
-  font-weight: 700;
-}
-
-.col-ctr{
-  width: 95px;
-  font-weight: 900;
-  font-size: 14px;
-  letter-spacing: 0.4px;
-}
-
-.ctrlabel{
-  color: var(--text);   /* white */
-}
-
-.ctractive{
-  color: var(--green);  /* green */
-}
-
-.ctroff{
-  color: rgba(234,242,255,.55);
-}  
-
-.col-rwy{ width: 120px; }
-
-.col-rwy{
-  font-weight: 900;      /* same as QNH */
-  font-size: 16px;       /* same as QNH */
-  letter-spacing: 0.5px; /* same as QNH */
-}  
-
-.sta{
-  color: var(--cyan);
-  font-weight: 900;          /* extra bold */
-  font-size: 16px;           /* bigger station text */
-  letter-spacing: 1.2px;
-  line-height: 1.1;
-}
   .muted{ color: rgba(234,242,255,.75); }
   .metar{
     white-space: pre-wrap;
@@ -253,16 +193,26 @@ body{
       <div class="pill" id="statusPill">STATUS: <span id="statusText">IDLE</span></div>
       <div class="pill" id="timePill">UTC: <span id="utcClock">--:--:--</span></div>
       <div class="controls">
+
+        <!-- ✅ PRESET MENU (this was missing) -->
+        <select id="presetSelect" class="pill" title="Station set">
+          <option value="EBG_NORD" selected>EBG NORD</option>
+          <option value="EBG_SUED">EBG SUED</option>
+          <option value="EDWW_WEST">EDWW WEST</option>
+        </select>
+
         <label class="pill">
           <input type="checkbox" id="autoToggle" checked />
           AUTO
         </label>
+
         <select id="refreshSelect" class="pill" title="Refresh interval">
           <option value="30">30s</option>
           <option value="60" selected>60s</option>
           <option value="120">2m</option>
           <option value="300">5m</option>
         </select>
+
         <button id="refreshBtn" class="pill">REFRESH</button>
       </div>
     </div>
@@ -292,12 +242,11 @@ body{
 </div>
 
 <script>
-  // Stations you asked for
   const STATION_PRESETS = {
-  EBG_NORD: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"],
-  EBG_SUED: ["EDDV","EDVE","EDVK","EDDW","EDDG","EDDP","ETNW","ETHB","ETHC","ETSH"],   // example: change to yours
-  EDWW_WEST: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","EDVE","EDVK","EDDP"],        // example: change to yours
-};
+    EBG_NORD: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"],
+    EBG_SUED: ["EDDV","EDVE","EDVK","EDDW","EDDG","EDDP","ETNW","ETHB","ETHC","ETSH"],
+    EDWW_WEST: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","EDVE","EDVK","EDDP"],
+  };
 
   let STATIONS = [...STATION_PRESETS.EBG_NORD];
   const API_BASE = "https://metar-proxy.chrisgut96.workers.dev";
@@ -315,143 +264,6 @@ body{
     lastRaw: new Map(), // station -> rawOb
   };
 
-  function setPreset(key){
-  STATIONS = [...(STATION_PRESETS[key] || STATION_PRESETS.EBG_NORD)];
-  state.lastRaw = new Map();     // reset change highlighting
-  ensureRows();                  // rebuild rows
-  fetchMetars();                 // refetch METARs
-  fetchAtisRunways();            // refetch runways (if you have it)
-  fetchOnlineCtr();              // refetch CTR (if you have it)
-}
-
-presetSelect.addEventListener("change", () => {
-  setPreset(presetSelect.value);
-});  
-
-  function setCtrLine(icao, isOnline) {
-  const el = document.getElementById(`ctr_${icao}`);
-  if (!el) return;
-
-  if (isOnline) {
-    el.innerHTML =
-      `<span class="ctrlabel">CTR:</span> ` +
-      `<span class="ctractive">Active</span>`;
-  } else {
-    el.innerHTML =
-      `<span class="ctrlabel">CTR:</span> ` +
-      `<span class="ctroff">OFF</span>`;
-  }
-}
-
-async function fetchOnlineCtr(){
-  try{
-    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data = await res.json();
-    const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
-
-    const ctrOnline = new Set();
-
-    for (const c of controllers) {
-      const cs = String(c?.callsign || "").toUpperCase().trim();
-      // Match: EDDH_CTR, EDWW_CTR, etc.
-      const m = cs.match(/^([A-Z]{4})_CTR\b/);
-      if (m) ctrOnline.add(m[1]);
-    }
-
-    for (const s of STATIONS) {
-      setCtrLine(s, ctrOnline.has(s));
-    }
-  } catch {
-    // ignore errors
-  }
-}  
-
-  function extractRunwaysFromAtis(textLinesOrString) {
-  const text = Array.isArray(textLinesOrString)
-    ? textLinesOrString.join(" ")
-    : String(textLinesOrString || "");
-
-  const t = text.toUpperCase().replace(/\s+/g, " ").trim();
-
-  const out = {
-    arrival: new Set(),
-    departure: new Set(),
-    general: new Set(),
-  };
-
-  const normRwy = (s) => String(s).toUpperCase().trim(); // keeps L/R/C
-
-  // 1) LDG xx ... TKOF yy  (order can vary; allow separators)
-  // Examples:
-  // "LDG 23 TKOF 33"
-  // "LDG RWY 23 / TKOF RWY 33"
-  // "LDG 05L TKOF 05R"
-  for (const m of t.matchAll(/\bLDG\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
-    out.arrival.add(normRwy(m[1]));
-  }
-  for (const m of t.matchAll(/\bTKOF\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
-    out.departure.add(normRwy(m[1]));
-  }
-
-  // 2) ARR/DEP variants (optional but helpful)
-  for (const m of t.matchAll(/\b(?:ARR|ARRIVAL)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
-    out.arrival.add(normRwy(m[1]));
-  }
-  for (const m of t.matchAll(/\b(?:DEP|DEPARTURE)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
-    out.departure.add(normRwy(m[1]));
-  }
-
-  // 3) Generic RWY xx  (only used if we didn't already find specific LDG/TKOF/ARR/DEP)
-  for (const m of t.matchAll(/\b(?:RWY|RUNWAY)\s+(\d{1,2}[LRC]?)\b/g)) {
-    out.general.add(normRwy(m[1]));
-  }
-
-  // If only RWY found and no explicit arrival/departure, treat as both (common ATIS style)
-  if (out.arrival.size === 0 && out.departure.size === 0 && out.general.size > 0) {
-    for (const r of out.general) {
-      out.arrival.add(r);
-      out.departure.add(r);
-    }
-  }
-
-  // Convert to arrays (sorted)
-  const toSorted = (set) => [...set].sort((a, b) => a.localeCompare(b));
-
-  return {
-    arrival: toSorted(out.arrival),
-    departure: toSorted(out.departure),
-    general: toSorted(out.general),
-  };
-}
-
-function formatRunwayDisplay(r) {
-  const a = r.arrival.join(" ").trim();
-  const d = r.departure.join(" ").trim();
-
-  // If we have both and they differ: RWY <LDG> <TKOF>
-  if (a && d && a !== d) return `RWY ${a} ${d}`;
-
-  // If we have either (RWY-only case becomes same for both)
-  const same = a || d;
-  if (same) return `RWY ${same}`;
-
-  // Last fallback
-  if (r.general.length) return `RWY ${r.general.join(" ")}`;
-
-  return "RWY --";
-}
-
-  function pad2(n){ return String(n).padStart(2,"0"); }
-  function setUtcClock(){
-    const d = new Date();
-    const s = `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
-    document.getElementById("utcClock").textContent = s;
-  }
-  setInterval(setUtcClock, 500);
-  setUtcClock();
-
   function setStatus(txt){ statusText.textContent = txt; }
   function showError(msg){
     errorBox.style.display = "block";
@@ -462,7 +274,49 @@ function formatRunwayDisplay(r) {
     errorBox.textContent = "";
   }
 
-  // JSON: altim = QNH in hPa already (e.g. 1021) -> show "Q1021"
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function setUtcClock(){
+    const d = new Date();
+    const s = `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}`;
+    document.getElementById("utcClock").textContent = s;
+  }
+  setInterval(setUtcClock, 500);
+  setUtcClock();
+
+  function extractRunwaysFromAtis(textLinesOrString) {
+    const text = Array.isArray(textLinesOrString)
+      ? textLinesOrString.join(" ")
+      : String(textLinesOrString || "");
+    const t = text.toUpperCase().replace(/\s+/g, " ").trim();
+
+    const out = { arrival:new Set(), departure:new Set(), general:new Set() };
+    const normRwy = (s) => String(s).toUpperCase().trim();
+
+    for (const m of t.matchAll(/\bLDG\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) out.arrival.add(normRwy(m[1]));
+    for (const m of t.matchAll(/\bTKOF\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) out.departure.add(normRwy(m[1]));
+    for (const m of t.matchAll(/\b(?:ARR|ARRIVAL)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) out.arrival.add(normRwy(m[1]));
+    for (const m of t.matchAll(/\b(?:DEP|DEPARTURE)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) out.departure.add(normRwy(m[1]));
+    for (const m of t.matchAll(/\b(?:RWY|RUNWAY)\s+(\d{1,2}[LRC]?)\b/g)) out.general.add(normRwy(m[1]));
+
+    if (out.arrival.size === 0 && out.departure.size === 0 && out.general.size > 0) {
+      for (const r of out.general) { out.arrival.add(r); out.departure.add(r); }
+    }
+
+    const toSorted = (set) => [...set].sort((a,b) => a.localeCompare(b));
+    return { arrival:toSorted(out.arrival), departure:toSorted(out.departure), general:toSorted(out.general) };
+  }
+
+  // ✅ RWY 23 33 (LDG first, TKOF second), else RWY 23
+  function formatRunwayDisplay(r) {
+    const a = r.arrival.join(" ").trim();
+    const d = r.departure.join(" ").trim();
+    if (a && d && a !== d) return `RWY ${a} ${d}`;
+    const same = a || d;
+    if (same) return `RWY ${same}`;
+    if (r.general.length) return `RWY ${r.general.join(" ")}`;
+    return "RWY --";
+  }
+
   function fmtQnh(item){
     const qnh = item?.altim;
     if (qnh == null || qnh === "") return "--";
@@ -470,157 +324,42 @@ function formatRunwayDisplay(r) {
     return isNaN(n) ? `Q${String(qnh)}` : `Q${Math.round(n)}`;
   }
 
-  // JSON: temp, dewp are numeric C
-  function fmtTemp(item){
-    const t = item?.temp;
-    const d = item?.dewp;
-    if (t == null && d == null) return "--/--";
-    const tt = (t == null) ? "--" : Math.round(Number(t));
-    const dd = (d == null) ? "--" : Math.round(Number(d));
-    return `${tt}/${dd}`;
+  function fmtWind(item){
+    const raw = (item?.rawOb ?? "") || "";
+    const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
+    if (m) {
+      const dir = m[1].toUpperCase();
+      const spd = parseInt(m[2], 10);
+      const gst = m[3] ? parseInt(m[3], 10) : null;
+      if (dir === "000" && spd === 0) return "CALM";
+      const spdStr = String(spd).padStart(2, "0");
+      const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
+      return (dir === "VRB") ? `VRB/${spdStr}${gstStr}` : `${dir}/${spdStr}${gstStr}`;
+    }
+    const dir = item?.wdir;
+    const spd = item?.wspd;
+    if (dir == null && spd == null) return "----";
+    if (Number(spd) === 0) return "CALM";
+    return `${String(Math.round(Number(dir))).padStart(3,"0")}/${String(Math.round(Number(spd))).padStart(2,"0")}`;
   }
 
-  // JSON: wdir (deg), wspd (kt)
-function fmtWind(item){
-  const raw = (item?.rawOb ?? "") || "";
-
-  // Parse wind group from raw METAR
-  // Matches: 25001KT, 25012G20KT, VRB01KT, VRB03G10KT, 00000KT
-  const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
-  if (m) {
-    const dir = m[1].toUpperCase();          // "250", "VRB", "000"
-    const spd = parseInt(m[2], 10);
-    const gst = m[3] ? parseInt(m[3], 10) : null;
-
-    // Calm
-    if (dir === "000" && spd === 0) {
-      return "CALM";
-    }
-
-    const spdStr = String(spd).padStart(2, "0");
-    const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
-
-    // Variable wind
-    if (dir === "VRB") {
-      return `VRB/${spdStr}${gstStr}`;
-    }
-
-    // Normal wind
-    return `${dir}/${spdStr}${gstStr}`;
-  }
-
-  // Fallback to numeric fields
-  const dir = item?.wdir;
-  const spd = item?.wspd;
-  const gst = item?.wgst ?? item?.gust ?? null;
-
-  if (dir == null && spd == null) return "----";
-  if (Number(spd) === 0) return "CALM";
-
-  const spdStr = String(Math.round(Number(spd))).padStart(2, "0");
-  const gstStr = gst != null ? ` G${String(Math.round(Number(gst))).padStart(2, "0")}` : "";
-
-  return `${String(Math.round(Number(dir))).padStart(3, "0")}/${spdStr}${gstStr}`;
-}
-
-  // VIS: prefer reading METAR visibility group from rawOb (e.g. "2000", "9999", "CAVOK")
   function fmtVis(item){
     const raw = (item?.rawOb ?? "") || "";
-
-    // CAVOK implies >= 10km
     if (/\bCAVOK\b/i.test(raw)) return "9999+";
-
-    // Find a standalone 4-digit visibility group (meters) early in the report.
-    // Example: "... 21005KT 2000 1200 R23/1700U ..."
-    // We'll take the first 4-digit group after wind if present.
     const m = raw.match(/\b\d{5}KT\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
-    if (m && m[1]) {
-      return (m[1] === "9999") ? "9999+" : m[1];
-    }
+    if (m && m[1]) return (m[1] === "9999") ? "9999+" : m[1];
 
-    // Fallback: convert JSON visib (statute miles) to meters
     const v = item?.visib;
     if (v == null || v === "") return "--";
     const miles = Number(v);
     if (isNaN(miles)) return String(v);
-
     const meters = Math.round(miles * 1609.34);
     if (meters >= 10000) return "9999+";
     const rounded = Math.round(meters / 50) * 50;
     return String(rounded);
   }
 
-function mkRow(station){
-  const tr = document.createElement("tr");
-  tr.id = `row_${station}`;
-  tr.innerHTML = `
-    <td class="col-sta">
-      <div class="sta">${station}</div>
-      <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
-    </td>
-
-    <td class="col-ctr" id="ctr_${station}">
-      <span class="ctrlabel">CTR:</span>
-      <span class="ctroff">OFF</span>
-    </td>
-
-    <td class="col-rwy" id="rwy_${station}">RWY --</td>
-    <td class="col-qnh" id="qnh_${station}">--</td>
-    <td class="col-wind" id="wind_${station}">----</td>
-    <td class="col-vis" id="vis_${station}">--</td>
-    <td class="col-met">
-      <div class="metar" id="metar_${station}">Loading…</div>
-    </td>
-  `;
-  return tr;
-}
-
-function setCtrCell(icao, online){
-  const el = document.getElementById(`ctr_${icao}`);
-  if (!el) return;
-
-  if (online) {
-    el.innerHTML =
-      `<span class="ctrlabel">CTR:</span> ` +
-      `<span class="ctractive">Active</span>`;
-  } else {
-    el.innerHTML =
-      `<span class="ctrlabel">CTR:</span> ` +
-      `<span class="ctroff">OFF</span>`;
-  }
-}
-
-async function fetchOnlineCtr(){
-  try{
-    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data = await res.json();
-    const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
-
-    const online = new Set();
-
-    for (const c of controllers) {
-      const cs = String(c?.callsign || "").toUpperCase().trim();
-      const m = cs.match(/^([A-Z]{4})_CTR\b/);
-      if (m) online.add(m[1]);
-    }
-
-    for (const s of STATIONS) {
-      setCtrCell(s, online.has(s));
-    }
-  } catch {
-    /* ignore errors */
-  }
-}  
-
-  function ensureRows(){
-    tbody.innerHTML = "";
-    for (const s of STATIONS) tbody.appendChild(mkRow(s));
-  }
-
   function obsZFromItem(item){
-    // Prefer reportTime ISO; fallback to obsTime epoch seconds
     let d = null;
     if (item?.reportTime) d = new Date(item.reportTime);
     else if (item?.obsTime != null) d = new Date(Number(item.obsTime) * 1000);
@@ -628,9 +367,36 @@ async function fetchOnlineCtr(){
     return `${pad2(d.getUTCDate())}${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}Z`;
   }
 
+  function mkRow(station){
+    const tr = document.createElement("tr");
+    tr.id = `row_${station}`;
+    tr.innerHTML = `
+      <td class="col-sta">
+        <div class="sta">${station}</div>
+        <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
+      </td>
+
+      <td class="col-ctr" id="ctr_${station}">
+        <span class="ctrlabel">CTR:</span>
+        <span class="ctroff">OFF</span>
+      </td>
+
+      <td class="col-rwy" id="rwy_${station}">RWY --</td>
+      <td class="col-qnh" id="qnh_${station}">--</td>
+      <td class="col-wind" id="wind_${station}">----</td>
+      <td class="col-vis" id="vis_${station}">--</td>
+      <td class="col-met"><div class="metar" id="metar_${station}">Loading…</div></td>
+    `;
+    return tr;
+  }
+
+  function ensureRows(){
+    tbody.innerHTML = "";
+    for (const s of STATIONS) tbody.appendChild(mkRow(s));
+  }
+
   function applyRow(station, item){
     const raw = (item?.rawOb ?? "") || "";
-
     document.getElementById(`obs_${station}`).textContent = obsZFromItem(item);
     document.getElementById(`qnh_${station}`).textContent = fmtQnh(item);
     document.getElementById(`wind_${station}`).textContent = fmtWind(item);
@@ -638,13 +404,72 @@ async function fetchOnlineCtr(){
 
     const met = document.getElementById(`metar_${station}`);
     const prev = state.lastRaw.get(station);
-
     met.classList.remove("changed","new");
     if (!prev && raw) met.classList.add("new");
     else if (prev && raw && prev !== raw) met.classList.add("changed");
-
     met.textContent = raw || "No METAR returned.";
     state.lastRaw.set(station, raw);
+  }
+
+  function setCtrCell(icao, online){
+    const el = document.getElementById(`ctr_${icao}`);
+    if (!el) return;
+    el.innerHTML = online
+      ? `<span class="ctrlabel">CTR:</span> <span class="ctractive">Active</span>`
+      : `<span class="ctrlabel">CTR:</span> <span class="ctroff">OFF</span>`;
+  }
+
+  async function fetchOnlineCtr(){
+    try{
+      const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
+
+      const online = new Set();
+      for (const c of controllers) {
+        const cs = String(c?.callsign || "").toUpperCase().trim();
+        const m = cs.match(/^([A-Z]{4})_CTR\b/);
+        if (m) online.add(m[1]);
+      }
+
+      for (const s of STATIONS) setCtrCell(s, online.has(s));
+    } catch {}
+  }
+
+  async function fetchAtisRunways(){
+    try{
+      const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const atisArr = Array.isArray(data?.atis) ? data.atis : [];
+      const atisByIcao = new Map();
+
+      for (const a of atisArr) {
+        const cs = String(a?.callsign || "").toUpperCase();
+        const m = cs.match(/^([A-Z]{4})_.*ATIS$/);
+        if (!m) continue;
+
+        const icao = m[1];
+        const lines = Array.isArray(a?.text_atis) ? a.text_atis : [];
+        const text = lines.join(" ").trim();
+        if (!text) continue;
+
+        const prev = atisByIcao.get(icao);
+        if (!prev || text.length > prev.text.length) atisByIcao.set(icao, { lines, text });
+      }
+
+      for (const s of STATIONS) {
+        const cell = document.getElementById(`rwy_${s}`);
+        if (!cell) continue;
+        const atis = atisByIcao.get(s);
+        if (!atis) { cell.textContent = "RWY --"; continue; }
+        const r = extractRunwaysFromAtis(atis.lines);
+        cell.textContent = formatRunwayDisplay(r) || "RWY --";
+      }
+    } catch {}
   }
 
   async function fetchMetars(){
@@ -658,7 +483,6 @@ async function fetchOnlineCtr(){
 
       const res = await fetch(url, { headers: { "Accept": "application/json" }, cache: "no-store" });
       if (res.status === 204) throw new Error("No data returned (HTTP 204).");
-
       if (!res.ok){
         const t = await res.text();
         throw new Error(`Request failed (HTTP ${res.status}).\n\n${t.slice(0,900)}`);
@@ -667,25 +491,22 @@ async function fetchOnlineCtr(){
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error("Unexpected JSON shape (expected array).");
 
-      // Map by icaoId (your JSON)
       const byStation = new Map();
       for (const item of data){
         const sid = item?.icaoId ? String(item.icaoId).toUpperCase().trim() : null;
-        if (!sid) continue;
-        byStation.set(sid, item);
+        if (sid) byStation.set(sid, item);
       }
 
       for (const s of STATIONS){
-        const key = String(s).toUpperCase().trim();
-        const item = byStation.get(key);
-
+        const item = byStation.get(s);
         if (!item){
-          applyRow(s, { rawOb: "— no station in response —" });
+          // ✅ no temp_ access anymore (it doesn't exist)
           document.getElementById(`obs_${s}`).textContent = "--Z";
           document.getElementById(`qnh_${s}`).textContent = "--";
-          document.getElementById(`temp_${s}`).textContent = "--/--";
           document.getElementById(`wind_${s}`).textContent = "----";
           document.getElementById(`vis_${s}`).textContent = "--";
+          document.getElementById(`metar_${s}`).textContent = "— no station in response —";
+          state.lastRaw.set(s, "");
         } else {
           applyRow(s, item);
         }
@@ -700,72 +521,51 @@ async function fetchOnlineCtr(){
     }
   }
 
-async function fetchAtisRunways(){
-  try{
-    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return;
-
-    const data = await res.json();
-    const atisArr = Array.isArray(data?.atis) ? data.atis : [];
-
-    const atisByIcao = new Map();
-
-    for (const a of atisArr) {
-      const cs = String(a?.callsign || "").toUpperCase();
-      const m = cs.match(/^([A-Z]{4})_.*ATIS$/);
-      if (!m) continue;
-
-      const icao = m[1];
-      const lines = Array.isArray(a?.text_atis) ? a.text_atis : [];
-      const text = lines.join(" ").trim();
-      if (!text) continue;
-
-      const prev = atisByIcao.get(icao);
-      if (!prev || text.length > prev.text.length) {
-        atisByIcao.set(icao, { lines, text });
-      }
-    }
-
-    for (const s of STATIONS) {
-      const cell = document.getElementById(`rwy_${s}`);
-      if (!cell) continue;
-
-      const atis = atisByIcao.get(s);
-      if (!atis) {
-        cell.textContent = "RWY --";
-        continue;
-      }
-
-      const r = extractRunwaysFromAtis(atis.lines);
-      cell.textContent = formatRunwayDisplay(r) || "RWY --";
-    }
-  } catch {
-    // ignore ATIS errors
-  }
-}
-
-  function startTimer(){
-    stopTimer();
-    if (!autoToggle.checked) return;
-    const secs = Number(refreshSelect.value) || 60;
-    state.timer = setInterval(fetchMetars, secs * 1000);
-  }
   function stopTimer(){
     if (state.timer) clearInterval(state.timer);
     state.timer = null;
   }
 
-  refreshBtn.addEventListener("click", fetchMetars);
+  function startTimer(){
+    stopTimer();
+    if (!autoToggle.checked) return;
+    const secs = Number(refreshSelect.value) || 60;
+    state.timer = setInterval(() => {
+      fetchMetars();
+      fetchAtisRunways();
+      fetchOnlineCtr();
+    }, secs * 1000);
+  }
+
+  function setPreset(key){
+    STATIONS = [...(STATION_PRESETS[key] || STATION_PRESETS.EBG_NORD)];
+    state.lastRaw = new Map();
+    ensureRows();
+    fetchMetars();
+    fetchAtisRunways();
+    fetchOnlineCtr();
+    startTimer();
+  }
+
+  // UI hooks
+  refreshBtn.addEventListener("click", () => {
+    fetchMetars();
+    fetchAtisRunways();
+    fetchOnlineCtr();
+  });
   autoToggle.addEventListener("change", startTimer);
   refreshSelect.addEventListener("change", startTimer);
-  
-const saved = localStorage.getItem("preset") || "EBG_NORD";
-presetSelect.value = saved;
-setPreset(saved);
-startTimer();
-  
-setInterval(fetchAtisRunways, 60000);
-setInterval(fetchOnlineCtr, 60000);
+
+  // ✅ preset dropdown hook (now presetSelect exists)
+  presetSelect.addEventListener("change", () => {
+    localStorage.setItem("preset", presetSelect.value);
+    setPreset(presetSelect.value);
+  });
+
+  // Initial load
+  const saved = localStorage.getItem("preset") || "EBG_NORD";
+  presetSelect.value = saved;
+  setPreset(saved);
 </script>
 
 </body>
