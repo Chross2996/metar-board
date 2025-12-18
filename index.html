@@ -324,6 +324,10 @@ body{
   fetchOnlineCtr();              // refetch CTR (if you have it)
 }
 
+presetSelect.addEventListener("change", () => {
+  setPreset(presetSelect.value);
+});  
+
   function setCtrLine(icao, isOnline) {
   const el = document.getElementById(`ctr_${icao}`);
   if (!el) return;
@@ -338,10 +342,6 @@ body{
       `<span class="ctroff">OFF</span>`;
   }
 }
-
-presetSelect.addEventListener("change", () => {
-  setPreset(presetSelect.value);
-}); 
 
 async function fetchOnlineCtr(){
   try{
@@ -758,12 +758,12 @@ async function fetchAtisRunways(){
   refreshBtn.addEventListener("click", fetchMetars);
   autoToggle.addEventListener("change", startTimer);
   refreshSelect.addEventListener("change", startTimer);
-ensureRows();
-fetchMetars();
-fetchAtisRunways();
-fetchOnlineCtr();
+  
+const saved = localStorage.getItem("preset") || "EBG_NORD";
+presetSelect.value = saved;
+setPreset(saved);
 startTimer();
-
+  
 setInterval(fetchAtisRunways, 60000);
 setInterval(fetchOnlineCtr, 60000);
 </script>
