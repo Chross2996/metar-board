@@ -257,6 +257,73 @@ body{
     lastRaw: new Map(), // station -> rawOb
   };
 
+  function extractRunwaysFromAtis(textLinesOrString) {
+  const text = Array.isArray(textLinesOrString)
+    ? textLinesOrString.join(" ")
+    : String(textLinesOrString || "");
+
+  const t = text.toUpperCase().replace(/\s+/g, " ").trim();
+
+  const out = {
+    arrival: new Set(),
+    departure: new Set(),
+    general: new Set(),
+  };
+
+  const normRwy = (s) => String(s).toUpperCase().trim(); // keeps L/R/C
+
+  // 1) LDG xx ... TKOF yy  (order can vary; allow separators)
+  // Examples:
+  // "LDG 23 TKOF 33"
+  // "LDG RWY 23 / TKOF RWY 33"
+  // "LDG 05L TKOF 05R"
+  for (const m of t.matchAll(/\bLDG\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+    out.arrival.add(normRwy(m[1]));
+  }
+  for (const m of t.matchAll(/\bTKOF\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+    out.departure.add(normRwy(m[1]));
+  }
+
+  // 2) ARR/DEP variants (optional but helpful)
+  for (const m of t.matchAll(/\b(?:ARR|ARRIVAL)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+    out.arrival.add(normRwy(m[1]));
+  }
+  for (const m of t.matchAll(/\b(?:DEP|DEPARTURE)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+    out.departure.add(normRwy(m[1]));
+  }
+
+  // 3) Generic RWY xx  (only used if we didn't already find specific LDG/TKOF/ARR/DEP)
+  for (const m of t.matchAll(/\b(?:RWY|RUNWAY)\s+(\d{1,2}[LRC]?)\b/g)) {
+    out.general.add(normRwy(m[1]));
+  }
+
+  // If only RWY found and no explicit arrival/departure, treat as both (common ATIS style)
+  if (out.arrival.size === 0 && out.departure.size === 0 && out.general.size > 0) {
+    for (const r of out.general) {
+      out.arrival.add(r);
+      out.departure.add(r);
+    }
+  }
+
+  // Convert to arrays (sorted)
+  const toSorted = (set) => [...set].sort((a, b) => a.localeCompare(b));
+
+  return {
+    arrival: toSorted(out.arrival),
+    departure: toSorted(out.departure),
+    general: toSorted(out.general),
+  };
+}
+
+  function formatRunwayDisplay(r) {
+  const a = r.arrival.join(", ");
+  const d = r.departure.join(", ");
+  if (a && d && a !== d) return `LDG ${a}  TKOF ${d}`;
+  if (a && d) return `RWY ${a}`; // same runway for both
+  if (r.general.length) return `RWY ${r.general.join(", ")}`;
+  return "";
+}
+
   function pad2(n){ return String(n).padStart(2,"0"); }
   function setUtcClock(){
     const d = new Date();
