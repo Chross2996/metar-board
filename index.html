@@ -292,30 +292,43 @@ body{
 function fmtWind(item){
   const raw = (item?.rawOb ?? "") || "";
 
-  // Prefer parsing from raw METAR wind group
+  // Parse wind group from raw METAR
   // Matches: 25001KT, 25012G20KT, VRB01KT, VRB03G10KT, 00000KT
-  const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(G(\d{2,3}))?KT\b/i);
+  const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
   if (m) {
-    const dir = m[1].toUpperCase();     // "250" or "VRB" or "000"
-    const spd = String(parseInt(m[2], 10)).padStart(2, "0");
-    const gst = m[4] ? `G${String(parseInt(m[4], 10)).padStart(2, "0")}` : "";
+    const dir = m[1].toUpperCase();          // "250", "VRB", "000"
+    const spd = parseInt(m[2], 10);
+    const gst = m[3] ? parseInt(m[3], 10) : null;
 
-    // Calm wind: 00000KT
-    if (dir === "000" && spd === "00" && !gst) return "CALM";
+    // Calm
+    if (dir === "000" && spd === 0) {
+      return "CALM";
+    }
 
-    // Keep your compact display style: "25001G20" or "VRB01G10"
-    return `${dir}${spd}${gst}`;
+    const spdStr = String(spd).padStart(2, "0");
+    const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
+
+    // Variable wind
+    if (dir === "VRB") {
+      return `VRB/${spdStr}${gstStr}`;
+    }
+
+    // Normal wind
+    return `${dir}/${spdStr}${gstStr}`;
   }
 
-  // Fallback to fields if rawOb not present
+  // Fallback to numeric fields
   const dir = item?.wdir;
   const spd = item?.wspd;
+  const gst = item?.wgst ?? item?.gust ?? null;
 
   if (dir == null && spd == null) return "----";
+  if (Number(spd) === 0) return "CALM";
 
-  const d = (dir == null) ? "///" : String(Math.round(Number(dir))).padStart(3,"0");
-  const s = (spd == null) ? "//" : String(Math.round(Number(spd))).padStart(2,"0");
-  return `${d}${s}`;
+  const spdStr = String(Math.round(Number(spd))).padStart(2, "0");
+  const gstStr = gst != null ? ` G${String(Math.round(Number(gst))).padStart(2, "0")}` : "";
+
+  return `${String(Math.round(Number(dir))).padStart(3, "0")}/${spdStr}${gstStr}`;
 }
 
   // VIS: prefer reading METAR visibility group from rawOb (e.g. "2000", "9999", "CAVOK")
