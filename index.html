@@ -178,6 +178,25 @@ body{
 .ctroff{
   color: rgba(234,242,255,.55);
   font-weight: 700;
+}
+
+.col-ctr{
+  width: 95px;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+}
+
+.ctrlabel{
+  color: var(--text);   /* white */
+}
+
+.ctractive{
+  color: var(--green);  /* green */
+}
+
+.ctroff{
+  color: rgba(234,242,255,.55);
 }  
 
 .col-rwy{ width: 120px; }
@@ -255,6 +274,7 @@ body{
     <thead>
       <tr>
         <th class="col-sta">STN</th>
+        <th class="col-ctr">CTR</th>
         <th class="col-rwy">RWY</th>
         <th class="col-qnh">QNH</th>
         <th class="col-wind">WIND</th>
@@ -518,20 +538,63 @@ function mkRow(station){
   tr.innerHTML = `
     <td class="col-sta">
       <div class="sta">${station}</div>
-      <div class="ctrline" id="ctr_${station}">
-        <span class="ctrlabel">CTR:</span>
-        <span class="ctroff">OFF</span>
-      </div>
       <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
     </td>
+
+    <td class="col-ctr" id="ctr_${station}">
+      <span class="ctrlabel">CTR:</span>
+      <span class="ctroff">OFF</span>
+    </td>
+
     <td class="col-rwy" id="rwy_${station}">RWY --</td>
     <td class="col-qnh" id="qnh_${station}">--</td>
     <td class="col-wind" id="wind_${station}">----</td>
     <td class="col-vis" id="vis_${station}">--</td>
-    <td class="col-met"><div class="metar" id="metar_${station}">Loading…</div></td>
+    <td class="col-met">
+      <div class="metar" id="metar_${station}">Loading…</div>
+    </td>
   `;
   return tr;
 }
+
+function setCtrCell(icao, online){
+  const el = document.getElementById(`ctr_${icao}`);
+  if (!el) return;
+
+  if (online) {
+    el.innerHTML =
+      `<span class="ctrlabel">CTR:</span> ` +
+      `<span class="ctractive">Active</span>`;
+  } else {
+    el.innerHTML =
+      `<span class="ctrlabel">CTR:</span> ` +
+      `<span class="ctroff">OFF</span>`;
+  }
+}
+
+async function fetchOnlineCtr(){
+  try{
+    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
+
+    const online = new Set();
+
+    for (const c of controllers) {
+      const cs = String(c?.callsign || "").toUpperCase().trim();
+      const m = cs.match(/^([A-Z]{4})_CTR\b/);
+      if (m) online.add(m[1]);
+    }
+
+    for (const s of STATIONS) {
+      setCtrCell(s, online.has(s));
+    }
+  } catch {
+    /* ignore errors */
+  }
+}  
 
   function ensureRows(){
     tbody.innerHTML = "";
