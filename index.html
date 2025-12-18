@@ -407,20 +407,18 @@ async function fetchOnlineCtr(){
 }
 
 function formatRunwayDisplay(r) {
-  const a = r.arrival.join(", ");
-  const d = r.departure.join(", ");
+  const a = r.arrival.join(" ").trim();
+  const d = r.departure.join(" ").trim();
 
-  // If we found explicit different arrival/departure
-  if (a && d && a !== d) return `LDG ${a} TKOF ${d}`;
+  // If we have both and they differ: RWY <LDG> <TKOF>
+  if (a && d && a !== d) return `RWY ${a} ${d}`;
 
-  // If we found something (either explicit or fallback from RWY)
-  if (a || d) {
-    const same = a || d; // they will be same in RWY-only case
-    return `RWY ${same}`;
-  }
+  // If we have either (RWY-only case becomes same for both)
+  const same = a || d;
+  if (same) return `RWY ${same}`;
 
-  // As last fallback: plain RWY matches
-  if (r.general.length) return `RWY ${r.general.join(", ")}`;
+  // Last fallback
+  if (r.general.length) return `RWY ${r.general.join(" ")}`;
 
   return "RWY --";
 }
