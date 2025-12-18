@@ -430,7 +430,7 @@
       const online = new Set();
       for (const c of controllers) {
         const cs = String(c?.callsign || "").toUpperCase().trim();
-        const m = cs.match(/^([A-Z]{4})_CTR\b/);
+        const m = cs.match(/^([A-Z]{4})_TWR\b/);
         if (m) online.add(m[1]);
       }
 
