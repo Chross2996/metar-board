@@ -220,7 +220,6 @@ body{
       <tr>
         <th class="col-sta">STN</th>
         <th class="col-qnh">QNH</th>
-        <th class="col-temp">T/D</th>
         <th class="col-wind">WIND</th>
         <th class="col-vis">VIS</th>
         <th class="col-met">METAR</th>
@@ -335,7 +334,6 @@ function mkRow(station){
       <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
     </td>
     <td class="col-qnh" id="qnh_${station}">--</td>
-    <td class="col-temp" id="temp_${station}">--/--</td>
     <td class="col-wind" id="wind_${station}">----</td>
     <td class="col-vis" id="vis_${station}">--</td>
     <td class="col-met"><div class="metar" id="metar_${station}">Loading…</div></td>
@@ -362,7 +360,6 @@ function mkRow(station){
 
     document.getElementById(`obs_${station}`).textContent = obsZFromItem(item);
     document.getElementById(`qnh_${station}`).textContent = fmtQnh(item);
-    document.getElementById(`temp_${station}`).textContent = fmtTemp(item);
     document.getElementById(`wind_${station}`).textContent = fmtWind(item);
     document.getElementById(`vis_${station}`).textContent = fmtVis(item);
 
