@@ -158,6 +158,28 @@ body{
   letter-spacing: 0.5px;
 }
 
+.ctrline{
+  margin-top:4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.ctrlabel{
+  color: var(--text);     /* white */
+  font-weight: 900;
+}
+
+.ctractive{
+  color: var(--green);    /* green */
+  font-weight: 900;
+}
+
+.ctroff{
+  color: rgba(234,242,255,.55);
+  font-weight: 700;
+}  
+
 .col-rwy{ width: 120px; }
 
 .col-rwy{
@@ -265,6 +287,46 @@ body{
     timer: null,
     lastRaw: new Map(), // station -> rawOb
   };
+
+  function setCtrLine(icao, isOnline) {
+  const el = document.getElementById(`ctr_${icao}`);
+  if (!el) return;
+
+  if (isOnline) {
+    el.innerHTML =
+      `<span class="ctrlabel">CTR:</span> ` +
+      `<span class="ctractive">Active</span>`;
+  } else {
+    el.innerHTML =
+      `<span class="ctrlabel">CTR:</span> ` +
+      `<span class="ctroff">OFF</span>`;
+  }
+}
+
+async function fetchOnlineCtr(){
+  try{
+    const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
+
+    const ctrOnline = new Set();
+
+    for (const c of controllers) {
+      const cs = String(c?.callsign || "").toUpperCase().trim();
+      // Match: EDDH_CTR, EDWW_CTR, etc.
+      const m = cs.match(/^([A-Z]{4})_CTR\b/);
+      if (m) ctrOnline.add(m[1]);
+    }
+
+    for (const s of STATIONS) {
+      setCtrLine(s, ctrOnline.has(s));
+    }
+  } catch {
+    // ignore errors
+  }
+}  
 
   function extractRunwaysFromAtis(textLinesOrString) {
   const text = Array.isArray(textLinesOrString)
@@ -456,6 +518,10 @@ function mkRow(station){
   tr.innerHTML = `
     <td class="col-sta">
       <div class="sta">${station}</div>
+      <div class="ctrline" id="ctr_${station}">
+        <span class="ctrlabel">CTR:</span>
+        <span class="ctroff">OFF</span>
+      </div>
       <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
     </td>
     <td class="col-rwy" id="rwy_${station}">RWY --</td>
@@ -614,10 +680,11 @@ async function fetchAtisRunways(){
 ensureRows();
 fetchMetars();
 fetchAtisRunways();
+fetchOnlineCtr();
 startTimer();
 
-// refresh ATIS runways every 60s as well (independent of METAR interval)
 setInterval(fetchAtisRunways, 60000);
+setInterval(fetchOnlineCtr, 60000);
 </script>
 
 </body>
