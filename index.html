@@ -135,16 +135,16 @@
   }
 
   .col-sta{ width: 90px; }
-  .col-ctr{ width: 95px; font-weight: 900; font-size: 14px; letter-spacing: 0.4px; }
+  .col-atis{ width: 95px; font-weight: 900; font-size: 14px; letter-spacing: 0.4px; }
   .col-rwy{ width: 120px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
   .col-qnh{ width: 92px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
   .col-wind{ width: 130px; font-weight: 900; font-size: 16px; letter-spacing: 0.6px; }
   .col-vis{ width: 90px; }
   .col-met{ width: auto; }
 
-  .ctrlabel{ color: var(--text); font-weight: 900; }
-  .ctractive{ color: var(--green); font-weight: 900; }
-  .ctroff{ color: rgba(234,242,255,.55); font-weight: 700; }
+  .atislabel{ color: var(--text); font-weight: 900; }
+  .atisactive{ color: var(--green); font-weight: 900; }
+  .atisoff{ color: rgba(234,242,255,.55); font-weight: 700; }
 
   .sta{
     color: var(--cyan);
@@ -193,8 +193,6 @@
       <div class="pill" id="statusPill">STATUS: <span id="statusText">IDLE</span></div>
       <div class="pill" id="timePill">UTC: <span id="utcClock">--:--:--</span></div>
       <div class="controls">
-
-        <!-- ✅ PRESET MENU (this was missing) -->
         <select id="presetSelect" class="pill" title="Station set">
           <option value="EBG_NORD" selected>EBG NORD</option>
           <option value="EBG_SUED">EBG SUED</option>
@@ -224,7 +222,7 @@
     <thead>
       <tr>
         <th class="col-sta">STN</th>
-        <th class="col-ctr">CTR</th>
+        <th class="col-atis">ATIS</th>
         <th class="col-rwy">RWY</th>
         <th class="col-qnh">QNH</th>
         <th class="col-wind">WIND</th>
@@ -261,7 +259,7 @@
 
   const state = {
     timer: null,
-    lastRaw: new Map(), // station -> rawOb
+    lastRaw: new Map(),
   };
 
   function setStatus(txt){ statusText.textContent = txt; }
@@ -306,7 +304,6 @@
     return { arrival:toSorted(out.arrival), departure:toSorted(out.departure), general:toSorted(out.general) };
   }
 
-  // ✅ RWY 23 33 (LDG first, TKOF second), else RWY 23
   function formatRunwayDisplay(r) {
     const a = r.arrival.join(" ").trim();
     const d = r.departure.join(" ").trim();
@@ -376,9 +373,9 @@
         <div class="muted" id="obs_${station}" style="margin-top:3px;font-size:11px;">--Z</div>
       </td>
 
-      <td class="col-ctr" id="ctr_${station}">
-        <span class="ctrlabel">CTR:</span>
-        <span class="ctroff">OFF</span>
+      <td class="col-atis" id="atis_${station}">
+        <span class="atislabel">ATIS:</span>
+        <span class="atisoff">--</span>
       </td>
 
       <td class="col-rwy" id="rwy_${station}">RWY --</td>
@@ -411,30 +408,46 @@
     state.lastRaw.set(station, raw);
   }
 
-  function setCtrCell(icao, online){
-    const el = document.getElementById(`ctr_${icao}`);
+  function setAtisCell(icao, letter){
+    const el = document.getElementById(`atis_${icao}`);
     if (!el) return;
-    el.innerHTML = online
-      ? `<span class="ctrlabel">CTR:</span> <span class="ctractive">Active</span>`
-      : `<span class="ctrlabel">CTR:</span> <span class="ctroff">OFF</span>`;
+
+    if (letter) {
+      el.innerHTML =
+        `<span class="atislabel">ATIS:</span> <span class="atisactive">${letter}</span>`;
+    } else {
+      el.innerHTML =
+        `<span class="atislabel">ATIS:</span> <span class="atisoff">--</span>`;
+    }
   }
 
-  async function fetchOnlineCtr(){
+  async function fetchAtisLetters(){
     try{
       const res = await fetch(`${API_BASE}/vatsim?_=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) return;
 
       const data = await res.json();
-      const controllers = Array.isArray(data?.controllers) ? data.controllers : [];
+      const atisArr = Array.isArray(data?.atis) ? data.atis : [];
 
-      const online = new Set();
-      for (const c of controllers) {
-        const cs = String(c?.callsign || "").toUpperCase().trim();
-        const m = cs.match(/^([A-Z]{4})_TWR\b/);
-        if (m) online.add(m[1]);
+      const atisByIcao = new Map();
+
+      for (const a of atisArr) {
+        const cs = String(a?.callsign || "").toUpperCase().trim();
+        const m = cs.match(/^([A-Z]{4})(?:_[A-Z])?_ATIS$/);
+        if (!m) continue;
+
+        const icao = m[1];
+        const code = String(a?.atis_code || "").toUpperCase().trim();
+        if (!code) continue;
+
+        if (!atisByIcao.has(icao)) {
+          atisByIcao.set(icao, code);
+        }
       }
 
-      for (const s of STATIONS) setCtrCell(s, online.has(s));
+      for (const s of STATIONS) {
+        setAtisCell(s, atisByIcao.get(s) || "");
+      }
     } catch {}
   }
 
@@ -500,7 +513,6 @@
       for (const s of STATIONS){
         const item = byStation.get(s);
         if (!item){
-          // ✅ no temp_ access anymore (it doesn't exist)
           document.getElementById(`obs_${s}`).textContent = "--Z";
           document.getElementById(`qnh_${s}`).textContent = "--";
           document.getElementById(`wind_${s}`).textContent = "----";
@@ -533,7 +545,7 @@
     state.timer = setInterval(() => {
       fetchMetars();
       fetchAtisRunways();
-      fetchOnlineCtr();
+      fetchAtisLetters();
     }, secs * 1000);
   }
 
@@ -543,26 +555,23 @@
     ensureRows();
     fetchMetars();
     fetchAtisRunways();
-    fetchOnlineCtr();
+    fetchAtisLetters();
     startTimer();
   }
 
-  // UI hooks
   refreshBtn.addEventListener("click", () => {
     fetchMetars();
     fetchAtisRunways();
-    fetchOnlineCtr();
+    fetchAtisLetters();
   });
   autoToggle.addEventListener("change", startTimer);
   refreshSelect.addEventListener("change", startTimer);
 
-  // ✅ preset dropdown hook (now presetSelect exists)
   presetSelect.addEventListener("change", () => {
     localStorage.setItem("preset", presetSelect.value);
     setPreset(presetSelect.value);
   });
 
-  // Initial load
   const saved = localStorage.getItem("preset") || "EBG_NORD";
   presetSelect.value = saved;
   setPreset(saved);
