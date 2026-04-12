@@ -407,18 +407,16 @@
     state.lastRaw.set(station, raw);
   }
 
-  function setAtisCell(icao, letter){
-    const el = document.getElementById(`atis_${icao}`);
-    if (!el) return;
+function setAtisCell(icao, letter){
+  const el = document.getElementById(`atis_${icao}`);
+  if (!el) return;
 
-    if (letter) {
-      el.innerHTML =
-        `<span class="atislabel">ATIS:</span> <span class="atisactive">${letter}</span>`;
-    } else {
-      el.innerHTML =
-        `<span class="atislabel">ATIS:</span> <span class="atisoff">--</span>`;
-    }
+  if (letter) {
+    el.innerHTML = `<span class="atisactive">${letter}</span>`;
+  } else {
+    el.innerHTML = `<span class="atisoff">--</span>`;
   }
+}
 
   async function fetchAtisLetters(){
     try{
