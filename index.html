@@ -287,11 +287,13 @@
   setUtcClock();
 
 function extractRunwaysFromAtis(textLinesOrString) {
-  const text = Array.isArray(textLinesOrString)
-    ? textLinesOrString.join(" ")
-    : String(textLinesOrString || "");
-
-  const t = text.toUpperCase().replace(/\s+/g, " ").trim();
+  const lines = Array.isArray(textLinesOrString)
+    ? textLinesOrString.map(x => String(x || "").toUpperCase().trim())
+    : String(textLinesOrString || "")
+        .toUpperCase()
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(Boolean);
 
   const out = {
     arrival: new Set(),
@@ -301,43 +303,53 @@ function extractRunwaysFromAtis(textLinesOrString) {
 
   const normRwy = (s) => String(s).toUpperCase().trim();
 
-  // 1) Explicit active runway phrases
-  for (const m of t.matchAll(/\bLDG\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+  // 1) Explicit active runway phrases anywhere in the text
+  const joined = lines.join(" ");
+
+  for (const m of joined.matchAll(/\bLDG\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
     out.arrival.add(normRwy(m[1]));
   }
 
-  for (const m of t.matchAll(/\bTKOF\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+  for (const m of joined.matchAll(/\bTKOF\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
     out.departure.add(normRwy(m[1]));
   }
 
-  for (const m of t.matchAll(/\b(?:ARR|ARRIVAL)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+  for (const m of joined.matchAll(/\b(?:ARR|ARRIVAL)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
     out.arrival.add(normRwy(m[1]));
   }
 
-  for (const m of t.matchAll(/\b(?:DEP|DEPARTURE)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
+  for (const m of joined.matchAll(/\b(?:DEP|DEPARTURE)\b(?:\s+(?:RWY|RUNWAY))?\s+(\d{1,2}[LRC]?)\b/g)) {
     out.departure.add(normRwy(m[1]));
   }
 
-  // 2) Generic RWY declarations:
-  // Accept only if followed by runway numbers only, and stop if extra words appear.
-  // Examples accepted:
-  //   RWY 23
+  // 2) Standalone RWY lines only.
+  // Accept:
+  //   RWY 09R
+  //   RWY 09R/27L
   //   RWY 09L 09R
-  // Rejected:
-  //   RWY 09R CLSD
-  //   RWY 09R CLOSED DUE TO WIP
-  const genericMatches = t.matchAll(/\b(?:RWY|RUNWAY)\s+((?:\d{1,2}[LRC]?)(?:\s+\d{1,2}[LRC]?)*)\b/g);
-  for (const m of genericMatches) {
-    const group = m[1].trim();
+  // Reject:
+  //   RWY 09L/27R CLSD DUE TO WIP
+  //   RWY 09R CLOSED
+  //   RWY 09R NOT AVBL
+  for (const line of lines) {
+    const m = line.match(/^\s*(?:RWY|RUNWAY)\s+([0-9]{1,2}[LRC]?(?:\/[0-9]{1,2}[LRC]?)?(?:\s+[0-9]{1,2}[LRC]?(?:\/[0-9]{1,2}[LRC]?)?)*)\s*$/);
+    if (!m) continue;
 
-    // Split and add only pure runway tokens
-    const runways = group.match(/\d{1,2}[LRC]?/g) || [];
-    for (const rwy of runways) {
-      out.general.add(normRwy(rwy));
+    const group = m[1];
+
+    // Split tokens like "09L/27R 09R/27L"
+    const tokens = group.split(/\s+/);
+    for (const token of tokens) {
+      // For active runway set, keep only the first runway direction shown.
+      // Example: "09R/27L" -> use "09R"
+      const first = token.split("/")[0];
+      if (/^\d{1,2}[LRC]?$/.test(first)) {
+        out.general.add(normRwy(first));
+      }
     }
   }
 
-  // If only generic RWY was found, treat as active set
+  // If only generic RWY lines were found, treat them as the active set
   if (out.arrival.size === 0 && out.departure.size === 0 && out.general.size > 0) {
     for (const r of out.general) {
       out.arrival.add(r);
