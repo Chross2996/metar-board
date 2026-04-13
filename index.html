@@ -328,17 +328,35 @@
       const dir = m[1].toUpperCase();
       const spd = parseInt(m[2], 10);
       const gst = m[3] ? parseInt(m[3], 10) : null;
-      if (dir === "000" && spd === 0) return "CALM";
-      const spdStr = String(spd).padStart(2, "0");
-      const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
-      return (dir === "VRB") ? `VRB/${spdStr}${gstStr}` : `${dir}/${spdStr}${gstStr}`;
+function fmtWind(item){
+  const raw = (item?.rawOb ?? "") || "";
+  const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
+
+  if (m) {
+    const dir = m[1].toUpperCase();
+    const spd = parseInt(m[2], 10);
+    const gst = m[3] ? parseInt(m[3], 10) : null;
+
+    if (dir === "000" && spd === 0) return "CALM";
+
+    const spdStr = String(spd).padStart(2, "0");
+    const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
+
+    if (dir === "VRB") {
+      return `VRB/${spdStr}${gstStr}kt`;
     }
-    const dir = item?.wdir;
-    const spd = item?.wspd;
-    if (dir == null && spd == null) return "----";
-    if (Number(spd) === 0) return "CALM";
-    return `${String(Math.round(Number(dir))).padStart(3,"0")}/${String(Math.round(Number(spd))).padStart(2,"0")}`;
+
+    return `${dir}/${spdStr}${gstStr}kt`;
   }
+
+  const dir = item?.wdir;
+  const spd = item?.wspd;
+
+  if (dir == null && spd == null) return "----";
+  if (Number(spd) === 0) return "CALM";
+
+  return `${String(Math.round(Number(dir))).padStart(3,"0")}/${String(Math.round(Number(spd))).padStart(2,"0")}kt`;
+}
 
   function fmtVis(item){
     const raw = (item?.rawOb ?? "") || "";
