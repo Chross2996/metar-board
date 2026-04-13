@@ -162,6 +162,11 @@
   .changed{ color: var(--red); }
   .new{ color: var(--green); }
 
+  .lvo{
+    color: var(--yellow);
+    font-weight: 900;
+  }
+
   .foot{
     padding:10px 12px;
     border-top: 2px solid var(--line);
@@ -325,7 +330,7 @@
 
   function fmtWind(item){
     const raw = (item?.rawOb ?? "") || "";
-    const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?kt\b/i);
+    const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
 
     if (m) {
       const dir = m[1].toUpperCase();
@@ -338,13 +343,13 @@
 
       if (dir === "VRB") {
         return gst != null
-          ? `VRB/${spdStr} G${String(gst).padStart(2, "0")}kt`
-          : `VRB/${spdStr}kt`;
+          ? `VRB/${spdStr} G${String(gst).padStart(2, "0")}KT`
+          : `VRB/${spdStr}KT`;
       }
 
       return gst != null
-        ? `${dir}/${spdStr} G${String(gst).padStart(2, "0")}kt`
-        : `${dir}/${spdStr}kt`;
+        ? `${dir}/${spdStr} G${String(gst).padStart(2, "0")}KT`
+        : `${dir}/${spdStr}KT`;
     }
 
     const dir = item?.wdir;
@@ -358,14 +363,50 @@
     const spdStr = String(Math.round(Number(spd))).padStart(2, "0");
 
     return gst != null
-      ? `${dirStr}/${spdStr} G${String(Math.round(Number(gst))).padStart(2, "0")}kt`
-      : `${dirStr}/${spdStr}kt`;
+      ? `${dirStr}/${spdStr} G${String(Math.round(Number(gst))).padStart(2, "0")}KT`
+      : `${dirStr}/${spdStr}KT`;
+  }
+
+  function hasLowCeilingLvo(raw){
+    if (!raw) return false;
+
+    const cloudMatches = raw.matchAll(/\b(BKN|OVC)(\d{3})\b/g);
+    for (const m of cloudMatches) {
+      const hundredsFt = parseInt(m[2], 10);
+      if (!isNaN(hundredsFt) && hundredsFt < 2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function hasLowRvrLvo(raw){
+    if (!raw) return false;
+
+    const rvrMatches = raw.matchAll(/\bR\d{2}[LRC]?\/([MP]?)(\d{4})[UDN]?\b/g);
+    for (const m of rvrMatches) {
+      const qualifier = m[1];
+      const value = parseInt(m[2], 10);
+
+      if (isNaN(value)) continue;
+      if (qualifier === "M") return true;
+      if (value < 600) return true;
+    }
+
+    return false;
+  }
+
+  function isLvoCondition(raw){
+    return hasLowCeilingLvo(raw) || hasLowRvrLvo(raw);
   }
 
   function fmtVis(item){
     const raw = (item?.rawOb ?? "") || "";
+
+    if (isLvoCondition(raw)) return "LVO";
+
     if (/\bCAVOK\b/i.test(raw)) return "9999+";
-    const m = raw.match(/\b\d{5}kt\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
+    const m = raw.match(/\b\d{5}KT\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
     if (m && m[1]) return (m[1] === "9999") ? "9999+" : m[1];
 
     const v = item?.visib;
@@ -418,7 +459,11 @@
     document.getElementById(`obs_${station}`).textContent = obsZFromItem(item);
     document.getElementById(`qnh_${station}`).textContent = fmtQnh(item);
     document.getElementById(`wind_${station}`).textContent = fmtWind(item);
-    document.getElementById(`vis_${station}`).textContent = fmtVis(item);
+
+    const visEl = document.getElementById(`vis_${station}`);
+    const visText = fmtVis(item);
+    visEl.textContent = visText;
+    visEl.classList.toggle("lvo", visText === "LVO");
 
     const met = document.getElementById(`metar_${station}`);
     const prev = state.lastRaw.get(station);
@@ -530,11 +575,14 @@
 
       for (const s of STATIONS){
         const item = byStation.get(s);
+        const visEl = document.getElementById(`vis_${s}`);
+
         if (!item){
           document.getElementById(`obs_${s}`).textContent = "--Z";
           document.getElementById(`qnh_${s}`).textContent = "--";
           document.getElementById(`wind_${s}`).textContent = "----";
           document.getElementById(`vis_${s}`).textContent = "--";
+          visEl.classList.remove("lvo");
           document.getElementById(`metar_${s}`).textContent = "— no station in response —";
           state.lastRaw.set(s, "");
         } else {
