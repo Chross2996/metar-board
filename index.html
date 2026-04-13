@@ -336,7 +336,6 @@ function fmtWind(item){
     const dir = m[1].toUpperCase();
     const spd = parseInt(m[2], 10);
     const gst = m[3] ? parseInt(m[3], 10) : null;
-
     if (dir === "000" && spd === 0) return "CALM";
 
     const spdStr = String(spd).padStart(2, "0");
