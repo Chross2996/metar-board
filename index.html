@@ -135,15 +135,14 @@
   }
 
   .col-sta{ width: 90px; }
-  .col-atis{ width: 95px; font-weight: 900; font-size: 20px; letter-spacing: 0.4px; }
+  .col-atis{ width: 95px; font-weight: 900; font-size: 20px; letter-spacing: 0.4px; text-align:center; }
   .col-rwy{ width: 120px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
   .col-qnh{ width: 92px; font-weight: 900; font-size: 16px; letter-spacing: 0.5px; }
-  .col-wind{ width: 130px; font-weight: 900; font-size: 16px; letter-spacing: 0.6px; }
+  .col-wind{ width: 140px; font-weight: 900; font-size: 16px; letter-spacing: 0.6px; }
   .col-vis{ width: 90px; }
   .col-met{ width: auto; }
 
-  .atislabel{ color: var(--text); font-weight: 900; }
-  .atisactive{ color: var(--green); font-weight: 700; }
+  .atisactive{ color: var(--text); font-weight: 900; }
   .atisoff{ color: rgba(234,242,255,.55); font-weight: 700; }
 
   .sta{
@@ -297,7 +296,10 @@
     for (const m of t.matchAll(/\b(?:RWY|RUNWAY)\s+(\d{1,2}[LRC]?)\b/g)) out.general.add(normRwy(m[1]));
 
     if (out.arrival.size === 0 && out.departure.size === 0 && out.general.size > 0) {
-      for (const r of out.general) { out.arrival.add(r); out.departure.add(r); }
+      for (const r of out.general) {
+        out.arrival.add(r);
+        out.departure.add(r);
+      }
     }
 
     const toSorted = (set) => [...set].sort((a,b) => a.localeCompare(b));
@@ -324,38 +326,41 @@
   function fmtWind(item){
     const raw = (item?.rawOb ?? "") || "";
     const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
+
     if (m) {
       const dir = m[1].toUpperCase();
       const spd = parseInt(m[2], 10);
       const gst = m[3] ? parseInt(m[3], 10) : null;
-function fmtWind(item){
-  const raw = (item?.rawOb ?? "") || "";
-  const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
 
-  if (m) {
-    const dir = m[1].toUpperCase();
-    const spd = parseInt(m[2], 10);
-    const gst = m[3] ? parseInt(m[3], 10) : null;
-    if (dir === "000" && spd === 0) return "CALM";
+      if (dir === "000" && spd === 0) return "CALM";
 
-    const spdStr = String(spd).padStart(2, "0");
-    const gstStr = gst != null ? ` G${String(gst).padStart(2, "0")}` : "";
+      const spdStr = String(spd).padStart(2, "0");
 
-    if (dir === "VRB") {
-      return `VRB/${spdStr}${gstStr}kt`;
+      if (dir === "VRB") {
+        return gst != null
+          ? `VRB/${spdStr} G${String(gst).padStart(2, "0")}KT`
+          : `VRB/${spdStr}KT`;
+      }
+
+      return gst != null
+        ? `${dir}/${spdStr} G${String(gst).padStart(2, "0")}KT`
+        : `${dir}/${spdStr}KT`;
     }
 
-    return `${dir}/${spdStr}${gstStr}kt`;
+    const dir = item?.wdir;
+    const spd = item?.wspd;
+    const gst = item?.wgst ?? item?.gust ?? null;
+
+    if (dir == null && spd == null) return "----";
+    if (Number(spd) === 0) return "CALM";
+
+    const dirStr = String(Math.round(Number(dir))).padStart(3, "0");
+    const spdStr = String(Math.round(Number(spd))).padStart(2, "0");
+
+    return gst != null
+      ? `${dirStr}/${spdStr} G${String(Math.round(Number(gst))).padStart(2, "0")}KT`
+      : `${dirStr}/${spdStr}KT`;
   }
-
-  const dir = item?.wdir;
-  const spd = item?.wspd;
-
-  if (dir == null && spd == null) return "----";
-  if (Number(spd) === 0) return "CALM";
-
-  return `${String(Math.round(Number(dir))).padStart(3,"0")}/${String(Math.round(Number(spd))).padStart(2,"0")}kt`;
-}
 
   function fmtVis(item){
     const raw = (item?.rawOb ?? "") || "";
@@ -424,16 +429,16 @@ function fmtWind(item){
     state.lastRaw.set(station, raw);
   }
 
-function setAtisCell(icao, letter){
-  const el = document.getElementById(`atis_${icao}`);
-  if (!el) return;
+  function setAtisCell(icao, letter){
+    const el = document.getElementById(`atis_${icao}`);
+    if (!el) return;
 
-  if (letter) {
-    el.innerHTML = `<span class="atisactive">${letter}</span>`;
-  } else {
-    el.innerHTML = `<span class="atisoff">--</span>`;
+    if (letter) {
+      el.innerHTML = `<span class="atisactive">${letter}</span>`;
+    } else {
+      el.innerHTML = `<span class="atisoff">--</span>`;
+    }
   }
-}
 
   async function fetchAtisLetters(){
     try{
@@ -442,7 +447,6 @@ function setAtisCell(icao, letter){
 
       const data = await res.json();
       const atisArr = Array.isArray(data?.atis) ? data.atis : [];
-
       const atisByIcao = new Map();
 
       for (const a of atisArr) {
