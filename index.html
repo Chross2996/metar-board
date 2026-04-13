@@ -325,7 +325,7 @@
 
   function fmtWind(item){
     const raw = (item?.rawOb ?? "") || "";
-    const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?KT\b/i);
+    const m = raw.match(/\b((?:\d{3}|VRB))(\d{2,3})(?:G(\d{2,3}))?kt\b/i);
 
     if (m) {
       const dir = m[1].toUpperCase();
@@ -338,13 +338,13 @@
 
       if (dir === "VRB") {
         return gst != null
-          ? `VRB/${spdStr} G${String(gst).padStart(2, "0")}KT`
-          : `VRB/${spdStr}KT`;
+          ? `VRB/${spdStr} G${String(gst).padStart(2, "0")}kt`
+          : `VRB/${spdStr}kt`;
       }
 
       return gst != null
-        ? `${dir}/${spdStr} G${String(gst).padStart(2, "0")}KT`
-        : `${dir}/${spdStr}KT`;
+        ? `${dir}/${spdStr} G${String(gst).padStart(2, "0")}kt`
+        : `${dir}/${spdStr}kt`;
     }
 
     const dir = item?.wdir;
@@ -358,14 +358,14 @@
     const spdStr = String(Math.round(Number(spd))).padStart(2, "0");
 
     return gst != null
-      ? `${dirStr}/${spdStr} G${String(Math.round(Number(gst))).padStart(2, "0")}KT`
-      : `${dirStr}/${spdStr}KT`;
+      ? `${dirStr}/${spdStr} G${String(Math.round(Number(gst))).padStart(2, "0")}kt`
+      : `${dirStr}/${spdStr}kt`;
   }
 
   function fmtVis(item){
     const raw = (item?.rawOb ?? "") || "";
     if (/\bCAVOK\b/i.test(raw)) return "9999+";
-    const m = raw.match(/\b\d{5}KT\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
+    const m = raw.match(/\b\d{5}kt\s+(?:\d{3}V\d{3}\s+)?(\d{4}|9999)\b/i);
     if (m && m[1]) return (m[1] === "9999") ? "9999+" : m[1];
 
     const v = item?.visib;
