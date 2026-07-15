@@ -181,6 +181,13 @@
     font-size:12px;
     color: rgba(234,242,255,.78);
   }
+
+.agreements{border-top:2px solid var(--line);padding:12px;background:rgba(0,0,0,.08)}
+.agreements h3{margin:0 0 10px;color:var(--yellow);font-family:var(--mono)}
+.agreement-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.agreement-row label{width:110px;font-family:var(--mono);font-weight:700;color:var(--cyan)}
+.agreement-row select{min-width:180px}
+
 </style>
 </head>
 <body>
@@ -238,7 +245,16 @@
     <tbody id="tbody"></tbody>
   </table>
 
-  <div class="foot">
+  
+<div class="agreements">
+<h3>AGREEMENTS</h3>
+<div class="agreement-row"><label>EDDH INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
+<div class="agreement-row"><label>EDDW INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
+<div class="agreement-row"><label>EDHI INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
+<div class="agreement-row"><label>EDHL INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
+</div>
+
+<div class="foot">
     <div>Source: METAR proxy → <span class="muted">metar-proxy.chrisgut96.workers.dev</span></div>
     <div>Tip: hard refresh with <span class="muted">Ctrl+F5</span> after updating</div>
   </div>
