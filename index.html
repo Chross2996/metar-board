@@ -248,10 +248,7 @@
   
 <div class="agreements">
 <h3>AGREEMENTS</h3>
-<div class="agreement-row"><label>EDDH INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
-<div class="agreement-row"><label>EDDW INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
-<div class="agreement-row"><label>EDHI INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
-<div class="agreement-row"><label>EDHL INB</label><select><option>--</option><option>NOLGO</option><option>DH612</option><option>DH257</option></select></div>
+<div id="agreementsBody"></div>
 </div>
 
 <div class="foot">
@@ -269,6 +266,42 @@
 
   let STATIONS = [...STATION_PRESETS.EBG_NORD];
   const API_BASE = "https://metar-proxy.chrisgut96.workers.dev";
+
+  const AGREEMENT_OPTIONS = ["--","NOLGO","DH612","DH257"];
+  const agreementsBody = document.getElementById("agreementsBody");
+
+  function agreementKey(preset, station){
+    return `agreement_${preset}_${station}`;
+  }
+
+  function renderAgreements(preset, stations){
+    agreementsBody.innerHTML = "";
+    for (const s of stations){
+      const row = document.createElement("div");
+      row.className = "agreement-row";
+
+      const label = document.createElement("label");
+      label.textContent = `${s} INB`;
+
+      const select = document.createElement("select");
+      for (const opt of AGREEMENT_OPTIONS){
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        select.appendChild(o);
+      }
+
+      const key = agreementKey(preset, s);
+      select.value = localStorage.getItem(key) || AGREEMENT_OPTIONS[0];
+      select.addEventListener("change", () => {
+        localStorage.setItem(key, select.value);
+      });
+
+      row.appendChild(label);
+      row.appendChild(select);
+      agreementsBody.appendChild(row);
+    }
+  }
 
   const presetSelect = document.getElementById("presetSelect");
   const refreshBtn = document.getElementById("refreshBtn");
@@ -676,6 +709,7 @@ function extractRunwaysFromAtis(textLinesOrString) {
     STATIONS = [...(STATION_PRESETS[key] || STATION_PRESETS.EBG_NORD)];
     state.lastRaw = new Map();
     ensureRows();
+    renderAgreements(key, STATIONS);
     fetchMetars();
     fetchAtisRunways();
     fetchAtisLetters();
