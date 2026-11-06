@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METAR Board — Charts</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#062a8a; --panel:#041f66; --panel2:#0733a5;
+    --line:#b9d3ff; --text:#eaf2ff; --cyan:#80d7ff; --yellow:#ffe26b;
+    --red:#ff5c5c; --green:#3dff9a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:18px;background:linear-gradient(180deg,#041a55 0%,#031445 55%,#020f36 100%);color:var(--text);font-family:var(--sans)}
+  .frame{border:2px solid var(--line);background:rgba(0,0,0,.06);box-shadow:0 16px 60px rgba(0,0,0,.35)}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:2px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.02))}
+  .title{font-family:var(--mono);font-weight:700;letter-spacing:.8px;font-size:18px;color:var(--yellow);text-transform:uppercase}
+  .muted{color:rgba(234,242,255,.75);font-family:var(--mono);font-size:12px;margin-top:2px}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:var(--mono);font-size:12px}
+  select,button,input,a.pill{font-family:var(--mono);font-size:12px;border:1px solid var(--line);background:rgba(0,0,0,.10);color:var(--text);padding:6px 8px;border-radius:3px;outline:none;text-decoration:none;white-space:nowrap}
+  button:hover,a.pill:hover{background:rgba(255,255,255,.08);cursor:pointer}
+  input{min-width:150px}
+
+  .ap{border-bottom:1px solid rgba(185,211,255,.55)}
+  .aphead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:10px 12px;background:rgba(0,0,0,.12);border-bottom:1px solid rgba(185,211,255,.35)}
+  .icao{font-family:var(--mono);font-weight:900;font-size:18px;letter-spacing:1.2px;color:var(--cyan)}
+  .apname{font-family:var(--mono);font-size:13px;color:var(--text);text-transform:uppercase}
+  .cnt{font-family:var(--mono);font-size:11px;color:rgba(234,242,255,.65);margin-left:auto}
+  .none .icao{color:rgba(128,215,255,.5)}
+  .nonemsg{padding:8px 12px;font-family:var(--mono);font-size:12px;color:rgba(234,242,255,.55)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;padding:10px 12px}
+  .chart{display:flex;align-items:center;gap:8px;text-align:left;width:100%;padding:8px 10px;font-size:13px;letter-spacing:.3px}
+  .chart .n{color:rgba(234,242,255,.5);min-width:20px}
+  .chart .t{flex:1;white-space:normal;word-break:break-word}
+  .tag{font-size:10px;padding:1px 4px;border:1px solid currentColor;border-radius:2px;letter-spacing:.5px}
+  .tag.ad{color:var(--green)} .tag.wpt{color:rgba(234,242,255,.6)} .tag.apch{color:var(--yellow)} .tag.sid{color:var(--cyan)}
+
+  .foot{padding:10px 12px;border-top:2px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;background:rgba(0,0,0,.10);font-family:var(--mono);font-size:12px;color:rgba(234,242,255,.78)}
+
+  /* viewer */
+  #viewer{display:none;position:fixed;inset:0;z-index:10;background:rgba(2,10,40,.96);flex-direction:column}
+  #viewer.open{display:flex}
+  .vbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:2px solid var(--line);background:var(--panel)}
+  .vtitle{font-family:var(--mono);font-weight:700;color:var(--yellow);flex:1;min-width:160px}
+  #frame{flex:1;width:100%;border:0;background:#fff}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="topbar">
+    <div>
+      <div class="title">Charts — Aerodrome &amp; Procedures</div>
+      <div class="muted">ET CENOR FLIP VOL II 01 OCT 2026 (AIRAC 2610) • sorted by document outline</div>
+    </div>
+    <div class="controls">
+      <a class="pill" href="./">&larr; METAR BOARD</a>
+      <select id="setSelect" title="Station set"></select>
+      <input id="q" type="search" placeholder="filter: RWY 25, TACAN, RNP…">
+    </div>
+  </div>
+  <div id="list"></div>
+  <div class="foot">
+    <div>Charts: <span id="totalCnt"></span></div>
+    <div>Keys in viewer: &larr; &rarr; = prev/next • Esc = close</div>
+  </div>
+</div>
+
+<div id="viewer">
+  <div class="vbar">
+    <button id="vPrev">&larr; PREV</button>
+    <button id="vNext">NEXT &rarr;</button>
+    <div class="vtitle" id="vTitle"></div>
+    <a class="pill" id="vOpen" target="_blank" rel="noopener">OPEN / DOWNLOAD</a>
+    <button id="vClose">CLOSE ✕</button>
+  </div>
+  <iframe id="frame" title="Chart"></iframe>
+</div>
+
+<script>
+  // Keep in sync with STATION_PRESETS in index.html
+  const STATION_PRESETS = {
+    EBG_NORD: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","ETNS","ETNH","ETMN","ETNT"],
+    EBG_SUED: ["EDDV","EDVE","EDVK","EDDW","EDDG","EDDP","ETNW","ETHB","ETHC","ETSH"],
+    EDWW_WEST: ["EDDH","EDHI","EDHL","EDDW","EDXW","EDDV","EDVE","EDVK","EDDP"],
+  };
+  const CHARTS = {"ETHB": {"name": "BUECKEBURG", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETHB/01_AERODROME_CHART.pdf", "page": 22, "pages": 1}, {"n": 2, "title": "HB 107 - 125", "file": "ETHB/02_HB_107_125.pdf", "page": 23, "pages": 1}, {"n": 3, "title": "RNP RWY 07", "file": "ETHB/03_RNP_RWY_07.pdf", "page": 24, "pages": 1}, {"n": 4, "title": "WAYPOINT LIST RNP RWY 07", "file": "ETHB/04_WAYPOINT_LIST_RNP_RWY_07.pdf", "page": 25, "pages": 1}, {"n": 5, "title": "COPTER RNP RWY 07", "file": "ETHB/05_COPTER_RNP_RWY_07.pdf", "page": 26, "pages": 1}, {"n": 6, "title": "WAYPOINT LIST COPTER RNP RWY 07", "file": "ETHB/06_WAYPOINT_LIST_COPTER_RNP_RWY_07.pdf", "page": 27, "pages": 1}, {"n": 7, "title": "RNP RWY 25", "file": "ETHB/07_RNP_RWY_25.pdf", "page": 28, "pages": 1}, {"n": 8, "title": "WAYPOINT LIST RNP RWY 25", "file": "ETHB/08_WAYPOINT_LIST_RNP_RWY_25.pdf", "page": 29, "pages": 1}, {"n": 9, "title": "COPTER RNP RWY 25", "file": "ETHB/09_COPTER_RNP_RWY_25.pdf", "page": 30, "pages": 1}, {"n": 10, "title": "WAYPOINT LIST COPTER RNP RWY 25", "file": "ETHB/10_WAYPOINT_LIST_COPTER_RNP_RWY_25.pdf", "page": 31, "pages": 1}, {"n": 11, "title": "ILS RWY 25", "file": "ETHB/11_ILS_RWY_25.pdf", "page": 32, "pages": 1}, {"n": 12, "title": "COPTER ILS RWY 25", "file": "ETHB/12_COPTER_ILS_RWY_25.pdf", "page": 33, "pages": 1}, {"n": 13, "title": "NDB A", "file": "ETHB/13_NDB_A.pdf", "page": 34, "pages": 1}, {"n": 14, "title": "NDB B", "file": "ETHB/14_NDB_B.pdf", "page": 35, "pages": 1}]}, "ETHC": {"name": "CELLE", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETHC/01_AERODROME_CHART.pdf", "page": 36, "pages": 1}, {"n": 2, "title": "HC 108 - 126", "file": "ETHC/02_HC_108_126.pdf", "page": 37, "pages": 1}, {"n": 3, "title": "RNAV SID AMALI 1C - 1D", "file": "ETHC/03_RNAV_SID_AMALI_1C_1D.pdf", "page": 38, "pages": 1}, {"n": 4, "title": "RNAV SID NIE 1C - 1D", "file": "ETHC/04_RNAV_SID_NIE_1C_1D.pdf", "page": 39, "pages": 1}, {"n": 5, "title": "RNAV SID OBATU 1C - 1D", "file": "ETHC/05_RNAV_SID_OBATU_1C_1D.pdf", "page": 40, "pages": 1}, {"n": 6, "title": "RNP RWY 08", "file": "ETHC/06_RNP_RWY_08.pdf", "page": 41, "pages": 1}, {"n": 7, "title": "WAYPOINT LIST RWY 08", "file": "ETHC/07_WAYPOINT_LIST_RWY_08.pdf", "page": 42, "pages": 1}, {"n": 8, "title": "COPTER NDB RWY 08", "file": "ETHC/08_COPTER_NDB_RWY_08.pdf", "page": 43, "pages": 1}, {"n": 9, "title": "RNP RWY 26", "file": "ETHC/09_RNP_RWY_26.pdf", "page": 44, "pages": 1}, {"n": 10, "title": "WAYPOINT LIST RWY 26", "file": "ETHC/10_WAYPOINT_LIST_RWY_26.pdf", "page": 45, "pages": 1}, {"n": 11, "title": "NDB RWY 26", "file": "ETHC/11_NDB_RWY_26.pdf", "page": 46, "pages": 1}]}, "ETNH": {"name": "HOHN", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETNH/01_AERODROME_CHART.pdf", "page": 73, "pages": 1}, {"n": 2, "title": "NH 108 - 126", "file": "ETNH/02_NH_108_126.pdf", "page": 74, "pages": 1}, {"n": 3, "title": "TACAN RWY 08", "file": "ETNH/03_TACAN_RWY_08.pdf", "page": 75, "pages": 1}, {"n": 4, "title": "RNP RWY 08", "file": "ETNH/04_RNP_RWY_08.pdf", "page": 76, "pages": 1}, {"n": 5, "title": "WAYPOINT LIST RWY 08", "file": "ETNH/05_WAYPOINT_LIST_RWY_08.pdf", "page": 77, "pages": 1}, {"n": 6, "title": "ILS or LOC RWY 26", "file": "ETNH/06_ILS_or_LOC_RWY_26.pdf", "page": 78, "pages": 1}, {"n": 7, "title": "TACAN RWY 26", "file": "ETNH/07_TACAN_RWY_26.pdf", "page": 79, "pages": 1}, {"n": 8, "title": "RNP RWY 26", "file": "ETNH/08_RNP_RWY_26.pdf", "page": 80, "pages": 1}, {"n": 9, "title": "WAYPOINT LIST RWY 26", "file": "ETNH/09_WAYPOINT_LIST_RWY_26.pdf", "page": 81, "pages": 1}]}, "ETSH": {"name": "HOLZDORF", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETSH/01_AERODROME_CHART.pdf", "page": 82, "pages": 1}, {"n": 2, "title": "SH 109 - 127", "file": "ETSH/02_SH_109_127.pdf", "page": 83, "pages": 1}, {"n": 3, "title": "RNP RWY 09", "file": "ETSH/03_RNP_RWY_09.pdf", "page": 84, "pages": 1}, {"n": 4, "title": "WAYPOINT LIST RWY 09", "file": "ETSH/04_WAYPOINT_LIST_RWY_09.pdf", "page": 85, "pages": 1}, {"n": 5, "title": "TACAN RWY 09", "file": "ETSH/05_TACAN_RWY_09.pdf", "page": 86, "pages": 1}, {"n": 6, "title": "NDB RWY 09", "file": "ETSH/06_NDB_RWY_09.pdf", "page": 87, "pages": 1}, {"n": 7, "title": "COPTER NDB RWY 09", "file": "ETSH/07_COPTER_NDB_RWY_09.pdf", "page": 88, "pages": 1}, {"n": 8, "title": "RNP RWY 27", "file": "ETSH/08_RNP_RWY_27.pdf", "page": 89, "pages": 1}, {"n": 9, "title": "WAYPOINT LIST RWY 27", "file": "ETSH/09_WAYPOINT_LIST_RWY_27.pdf", "page": 90, "pages": 1}, {"n": 10, "title": "ILS or LOC RWY 27", "file": "ETSH/10_ILS_or_LOC_RWY_27.pdf", "page": 91, "pages": 1}, {"n": 11, "title": "TACAN RWY 27", "file": "ETSH/11_TACAN_RWY_27.pdf", "page": 92, "pages": 1}]}, "ETMN": {"name": "NORDHOLZ", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETMN/01_AERODROME_CHART.pdf", "page": 174, "pages": 1}, {"n": 2, "title": "MN 108 - 126", "file": "ETMN/02_MN_108_126.pdf", "page": 175, "pages": 1}, {"n": 3, "title": "RNP RWY 08", "file": "ETMN/03_RNP_RWY_08.pdf", "page": 176, "pages": 1}, {"n": 4, "title": "WAYPOINT LIST RNP RWY 08", "file": "ETMN/04_WAYPOINT_LIST_RNP_RWY_08.pdf", "page": 177, "pages": 1}, {"n": 5, "title": "ILS or LOC RWY 08", "file": "ETMN/05_ILS_or_LOC_RWY_08.pdf", "page": 178, "pages": 1}, {"n": 6, "title": "TACAN RWY 08", "file": "ETMN/06_TACAN_RWY_08.pdf", "page": 179, "pages": 1}, {"n": 7, "title": "RNP RWY 26", "file": "ETMN/07_RNP_RWY_26.pdf", "page": 180, "pages": 1}, {"n": 8, "title": "WAYPOINT LIST RNP RWY 26", "file": "ETMN/08_WAYPOINT_LIST_RNP_RWY_26.pdf", "page": 181, "pages": 1}, {"n": 9, "title": "ILS or LOC RWY 26", "file": "ETMN/09_ILS_or_LOC_RWY_26.pdf", "page": 182, "pages": 1}, {"n": 10, "title": "NDB RWY 26", "file": "ETMN/10_NDB_RWY_26.pdf", "page": 183, "pages": 1}, {"n": 11, "title": "TACAN RWY 26", "file": "ETMN/11_TACAN_RWY_26.pdf", "page": 184, "pages": 1}]}, "ETNS": {"name": "SCHLESWIG", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETNS/01_AERODROME_CHART.pdf", "page": 185, "pages": 1}, {"n": 2, "title": "ETNS 1A - 2B", "file": "ETNS/02_ETNS_1A_2B.pdf", "page": 186, "pages": 1}, {"n": 3, "title": "RNP RWY 04", "file": "ETNS/03_RNP_RWY_04.pdf", "page": 187, "pages": 1}, {"n": 4, "title": "WAYPOINT LIST RWY 04", "file": "ETNS/04_WAYPOINT_LIST_RWY_04.pdf", "page": 188, "pages": 1}, {"n": 5, "title": "TACAN RWY 04", "file": "ETNS/05_TACAN_RWY_04.pdf", "page": 189, "pages": 1}, {"n": 6, "title": "ARA/IAA RWY 04", "file": "ETNS/06_ARA_IAA_RWY_04.pdf", "page": 190, "pages": 1}, {"n": 7, "title": "RNP RWY 22", "file": "ETNS/07_RNP_RWY_22.pdf", "page": 191, "pages": 1}, {"n": 8, "title": "WAYPOINT LIST RWY 22", "file": "ETNS/08_WAYPOINT_LIST_RWY_22.pdf", "page": 192, "pages": 1}, {"n": 9, "title": "TACAN RWY 22", "file": "ETNS/09_TACAN_RWY_22.pdf", "page": 193, "pages": 1}, {"n": 10, "title": "ARA/IAA RWY 22", "file": "ETNS/10_ARA_IAA_RWY_22.pdf", "page": 194, "pages": 1}, {"n": 11, "title": "GHTP RWY 25", "file": "ETNS/11_GHTP_RWY_25.pdf", "page": 195, "pages": 1}, {"n": 12, "title": "WAYPOINT LIST RWY 25", "file": "ETNS/12_WAYPOINT_LIST_RWY_25.pdf", "page": 196, "pages": 1}]}, "ETNT": {"name": "WITTMUNDHAFEN", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETNT/01_AERODROME_CHART.pdf", "page": 197, "pages": 1}, {"n": 2, "title": "ETNT 1E - 2W", "file": "ETNT/02_ETNT_1E_2W.pdf", "page": 198, "pages": 1}, {"n": 3, "title": "RNP RWY 07", "file": "ETNT/03_RNP_RWY_07.pdf", "page": 199, "pages": 1}, {"n": 4, "title": "WAYPOINT LIST RNP RWY 07", "file": "ETNT/04_WAYPOINT_LIST_RNP_RWY_07.pdf", "page": 200, "pages": 1}, {"n": 5, "title": "TACAN RWY 07", "file": "ETNT/05_TACAN_RWY_07.pdf", "page": 201, "pages": 1}, {"n": 6, "title": "RNP RWY 25", "file": "ETNT/06_RNP_RWY_25.pdf", "page": 202, "pages": 1}, {"n": 7, "title": "WAYPOINT LIST RNP RWY 25", "file": "ETNT/07_WAYPOINT_LIST_RNP_RWY_25.pdf", "page": 203, "pages": 1}, {"n": 8, "title": "ILS or LOC RWY 25", "file": "ETNT/08_ILS_or_LOC_RWY_25.pdf", "page": 204, "pages": 1}, {"n": 9, "title": "TACAN RWY 25", "file": "ETNT/09_TACAN_RWY_25.pdf", "page": 205, "pages": 1}]}, "ETNW": {"name": "WUNSTORF", "charts": [{"n": 1, "title": "AERODROME CHART", "file": "ETNW/01_AERODROME_CHART.pdf", "page": 206, "pages": 1}, {"n": 2, "title": "ETNW 1C - 1D", "file": "ETNW/02_ETNW_1C_1D.pdf", "page": 207, "pages": 1}, {"n": 3, "title": "NW 308 - 326", "file": "ETNW/03_NW_308_326.pdf", "page": 208, "pages": 1}, {"n": 4, "title": "CEL 1A - 1B", "file": "ETNW/04_CEL_1A_1B.pdf", "page": 209, "pages": 1}, {"n": 5, "title": "NIE 1A - 1B", "file": "ETNW/05_NIE_1A_1B.pdf", "page": 210, "pages": 1}, {"n": 6, "title": "SAS 1A", "file": "ETNW/06_SAS_1A.pdf", "page": 211, "pages": 1}, {"n": 7, "title": "ROBEG 1A - 1B", "file": "ETNW/07_ROBEG_1A_1B.pdf", "page": 212, "pages": 1}, {"n": 8, "title": "VAXEV 1A - 1B", "file": "ETNW/08_VAXEV_1A_1B.pdf", "page": 213, "pages": 1}, {"n": 9, "title": "ILS Z or LOC RWY 08", "file": "ETNW/09_ILS_Z_or_LOC_RWY_08.pdf", "page": 214, "pages": 1}, {"n": 10, "title": "TACAN RWY 02", "file": "ETNW/10_TACAN_RWY_02.pdf", "page": 215, "pages": 1}, {"n": 11, "title": "RNP RWY 02", "file": "ETNW/11_RNP_RWY_02.pdf", "page": 216, "pages": 1}, {"n": 12, "title": "WAYPOINT LIST RWY 02", "file": "ETNW/12_WAYPOINT_LIST_RWY_02.pdf", "page": 217, "pages": 1}, {"n": 13, "title": "TACAN RWY 08", "file": "ETNW/13_TACAN_RWY_08.pdf", "page": 218, "pages": 1}, {"n": 14, "title": "RNP RWY 08", "file": "ETNW/14_RNP_RWY_08.pdf", "page": 219, "pages": 1}, {"n": 15, "title": "WAYPOINT LIST RWY 08", "file": "ETNW/15_WAYPOINT_LIST_RWY_08.pdf", "page": 220, "pages": 1}, {"n": 16, "title": "TACAN RWY 20", "file": "ETNW/16_TACAN_RWY_20.pdf", "page": 221, "pages": 1}, {"n": 17, "title": "RNP RWY 20", "file": "ETNW/17_RNP_RWY_20.pdf", "page": 222, "pages": 1}, {"n": 18, "title": "WAYPOINT LIST RWY 20", "file": "ETNW/18_WAYPOINT_LIST_RWY_20.pdf", "page": 223, "pages": 1}, {"n": 19, "title": "ILS Z or LOC RWY 26", "file": "ETNW/19_ILS_Z_or_LOC_RWY_26.pdf", "page": 224, "pages": 1}, {"n": 20, "title": "TACAN RWY 26", "file": "ETNW/20_TACAN_RWY_26.pdf", "page": 225, "pages": 1}, {"n": 21, "title": "RNP RWY 26", "file": "ETNW/21_RNP_RWY_26.pdf", "page": 226, "pages": 1}, {"n": 22, "title": "WAYPOINT LIST RWY 26", "file": "ETNW/22_WAYPOINT_LIST_RWY_26.pdf", "page": 227, "pages": 1}]}};   // generated from the PDF outline
+  const BASE = "charts/";
+
+  const setSelect = document.getElementById("setSelect");
+  const listEl = document.getElementById("list");
+  const q = document.getElementById("q");
+
+  const ALL = [...new Set(Object.values(STATION_PRESETS).flat())];
+  const SETS = { ALL, ...STATION_PRESETS };
+  for (const k of Object.keys(SETS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k.replace("_", " ");
+    setSelect.appendChild(o);
+  }
+  setSelect.value = localStorage.getItem("chartsSet") || "ALL";
+  if (!SETS[setSelect.value]) setSelect.value = "ALL";
+
+  function tagOf(t){
+    if (/^AERODROME CHART/i.test(t)) return ["ad","AD"];
+    if (/^WAYPOINT LIST/i.test(t)) return ["wpt","WPT"];
+    if (/\bSID\b/i.test(t)) return ["sid","SID"];
+    if (/\bRWY\b/i.test(t) && /(RNP|RNAV|ILS|LOC|TACAN|NDB|GHTP|IAA|ARA)/i.test(t)) return ["apch","IAP"];
+    return null;
+  }
+
+  let visible = [];   // flat list of charts currently shown (viewer navigation)
+  let cur = -1;
+
+  function render(){
+    const set = SETS[setSelect.value];
+    const term = q.value.trim().toLowerCase();
+    listEl.innerHTML = "";
+    visible = [];
+    let total = 0;
+
+    for (const icao of set) {
+      const ap = CHARTS[icao];
+      const sec = document.createElement("div");
+      sec.className = "ap" + (ap ? "" : " none");
+      const head = document.createElement("div");
+      head.className = "aphead";
+      head.innerHTML = `<span class="icao">${icao}</span><span class="apname">${ap ? ap.name : ""}</span>`;
+      sec.appendChild(head);
+
+      if (!ap) {
+        if (term) continue;
+        const m = document.createElement("div");
+        m.className = "nonemsg";
+        m.textContent = "No charts in this document.";
+        sec.appendChild(m);
+        listEl.appendChild(sec);
+        continue;
+      }
+
+      const items = ap.charts.filter(c => !term || (icao + " " + c.title).toLowerCase().includes(term));
+      if (!items.length) continue;
+      const cnt = document.createElement("span");
+      cnt.className = "cnt"; cnt.textContent = `${items.length} CHARTS`;
+      head.appendChild(cnt);
+
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      for (const c of items) {
+        const idx = visible.push({ icao, ...c }) - 1;
+        total++;
+        const b = document.createElement("button");
+        b.className = "chart";
+        const tg = tagOf(c.title);
+        b.innerHTML = `<span class="n">${String(c.n).padStart(2,"0")}</span><span class="t"></span>` +
+                      (tg ? `<span class="tag ${tg[0]}">${tg[1]}</span>` : "");
+        b.querySelector(".t").textContent = c.title;
+        b.addEventListener("click", () => openViewer(idx));
+        grid.appendChild(b);
+      }
+      sec.appendChild(grid);
+      listEl.appendChild(sec);
+    }
+    document.getElementById("totalCnt").textContent = total;
+    if (!listEl.children.length) listEl.innerHTML = '<div class="nonemsg">No matching charts.</div>';
+  }
+
+  const viewer = document.getElementById("viewer");
+  const frame = document.getElementById("frame");
+  function openViewer(i){
+    if (i < 0 || i >= visible.length) return;
+    cur = i;
+    const c = visible[i];
+    const url = BASE + encodeURI(c.file);
+    document.getElementById("vTitle").textContent = `${c.icao} — ${c.title}`;
+    document.getElementById("vOpen").href = url;
+    frame.src = url + "#view=FitH";
+    viewer.classList.add("open");
+  }
+  function closeViewer(){ viewer.classList.remove("open"); frame.src = "about:blank"; cur = -1; }
+
+  document.getElementById("vClose").addEventListener("click", closeViewer);
+  document.getElementById("vPrev").addEventListener("click", () => openViewer(cur - 1));
+  document.getElementById("vNext").addEventListener("click", () => openViewer(cur + 1));
+  document.addEventListener("keydown", e => {
+    if (!viewer.classList.contains("open")) return;
+    if (e.key === "Escape") closeViewer();
+    else if (e.key === "ArrowLeft") openViewer(cur - 1);
+    else if (e.key === "ArrowRight") openViewer(cur + 1);
+  });
+
+  setSelect.addEventListener("change", () => { localStorage.setItem("chartsSet", setSelect.value); render(); });
+  q.addEventListener("input", render);
+  render();
+</script>
+</body>
+</html>
